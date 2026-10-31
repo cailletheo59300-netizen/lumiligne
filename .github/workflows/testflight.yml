@@ -18,10 +18,13 @@ jobs:
     env:
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-      # Numéro de build unique et croissant (App Store Connect refuse deux fois le même).
-      BUILD_NUMBER: ${{ github.run_number }}
     steps:
       - uses: actions/checkout@v4
+
+      # Numéro de build unique et croissant (App Store Connect refuse deux fois le même). On part de 100 : les
+      # premiers builds (1…) ont été envoyés depuis l'ancien dépôt.
+      - name: Numéro de build
+        run: echo "BUILD_NUMBER=$((100 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
 
       - name: Secrets présents
         env:
