@@ -1,0 +1,7 @@
+# Projet Xcode généré par XcodeGen (voir project.yml)
+*.xcodeproj/
+.build/
+.swiftpm/
+DerivedData/
+xcuserdata/
+.DS_Store
