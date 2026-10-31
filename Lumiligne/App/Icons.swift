@@ -138,15 +138,22 @@ struct ChestIcon: View {
     var size: CGFloat = 44
 
     var body: some View {
-        Canvas { context, s in
-            let w = s.width, h = s.height
-            let line = max(1, w * 0.045)
+        Canvas { context, s in Self.draw(context, s) }
+            .frame(width: size, height: size)
+            .accessibilityHidden(true)
+    }
+
+    private static func draw(_ context: GraphicsContext, _ s: CGSize) {
+            let w: CGFloat = s.width, h: CGFloat = s.height
+            let line: CGFloat = max(1, w * 0.045)
             // Rayons derrière le coffret.
             var rays = Path()
-            for angle in stride(from: -70.0, through: 70.0, by: 28.0) {
-                let a = (angle - 90) * .pi / 180
-                rays.move(to: CGPoint(x: w * 0.5, y: h * 0.42))
-                rays.addLine(to: CGPoint(x: w * 0.5 + cos(a) * w * 0.5, y: h * 0.42 + sin(a) * h * 0.42))
+            let center = CGPoint(x: w * 0.5, y: h * 0.42)
+            for degrees in stride(from: -70.0, through: 70.0, by: 28.0) {
+                let a = CGFloat((degrees - 90) * Double.pi / 180)
+                let end = CGPoint(x: center.x + cos(a) * w * 0.5, y: center.y + sin(a) * h * 0.42)
+                rays.move(to: center)
+                rays.addLine(to: end)
             }
             context.stroke(rays, with: .color(IconInk.gold.opacity(0.7)), style: StrokeStyle(lineWidth: line * 1.2, lineCap: .round))
             let box = CGRect(x: w * 0.12, y: h * 0.48, width: w * 0.76, height: h * 0.44)
@@ -168,9 +175,6 @@ struct ChestIcon: View {
             context.fill(gem, with: .linearGradient(Gradient(colors: [IconInk.cream, IconInk.gold, IconInk.amber]),
                                                     startPoint: CGPoint(x: 0, y: h * 0.42), endPoint: CGPoint(x: 0, y: h * 0.62)))
             context.stroke(gem, with: .color(IconInk.outline), lineWidth: line * 0.8)
-        }
-        .frame(width: size, height: size)
-        .accessibilityHidden(true)
     }
 }
 
