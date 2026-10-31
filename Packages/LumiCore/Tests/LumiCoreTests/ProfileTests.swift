@@ -131,7 +131,7 @@ final class ProfileTests: XCTestCase {
         XCTAssertEqual(profile.saved("level-1")?.elapsed, 9)
         for key in ["a", "b", "c", "d", "e"] { profile.save(SavedGrid(key: key, marks: [], elapsed: 0, hintsUsed: 0)) }
         XCTAssertEqual(profile.saved.count, Profile.maxSaved)
-        XCTAssertNil(profile.saved("level-1"))
+        XCTAssertNil(profile.saved("daily-x")) // la plus ancienne part
         profile.forget("b")
         XCTAssertNil(profile.saved("b"))
     }
