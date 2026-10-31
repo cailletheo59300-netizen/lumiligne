@@ -16,6 +16,17 @@ public struct SavedGrid: Codable, Equatable, Sendable {
     }
 }
 
+/// Résultat d'un niveau : meilleur temps, et s'il a été fini sans indice (médaille).
+public struct LevelStat: Codable, Equatable, Sendable {
+    public var bestTime: Int
+    public var noHint: Bool
+
+    public init(bestTime: Int, noHint: Bool) {
+        self.bestTime = bestTime
+        self.noHint = noHint
+    }
+}
+
 /// Ce que rapporte une grille finie.
 public struct Reward: Equatable, Sendable {
     public var hints = 0
@@ -25,6 +36,12 @@ public struct Reward: Equatable, Sendable {
     public var firstTime = false
     /// Thème débloqué par ce niveau.
     public var unlockedTheme: String?
+    /// Meilleur temps battu (niveaux).
+    public var newBest = false
+    /// Finie sans indice (niveaux).
+    public var noHint = false
+    /// Chapitre terminé avec ce niveau (premier passage).
+    public var chapterDone: Int?
 
     public init() {}
 }
@@ -58,6 +75,11 @@ public struct Profile: Codable, Equatable, Sendable {
     public var adHintsDay: String?
     public var adHintsCount = 0
 
+    /// Résultats des niveaux (clé : numéro du niveau).
+    public var levelStats: [String: LevelStat] = [:]
+    /// Grilles du mode Libre finies, par série (clé : « taille-difficulté »).
+    public var freeSolved: [String: Int] = [:]
+
     // Grilles commencées (clé de `PuzzleKind`).
     public var saved: [SavedGrid] = []
 
@@ -77,18 +99,51 @@ public struct Profile: Codable, Equatable, Sendable {
 
     public var nextLevel: Int { levelsDone + 1 }
 
-    /// Niveau fini. Seul le prochain niveau compte (les niveaux se font dans l'ordre).
+    /// Un niveau se joue s'il est déjà fini (on le rejoue) ou si c'est le prochain.
+    public func isUnlocked(_ level: Int) -> Bool { level >= 1 && level <= nextLevel }
+
+    public func stat(_ level: Int) -> LevelStat? { levelStats[String(level)] }
+
+    /// Niveau fini. Le meilleur temps et la médaille « sans indice » comptent à chaque fois ; la progression et les
+    /// récompenses seulement pour le prochain niveau (les niveaux se débloquent dans l'ordre).
     @discardableResult
-    public mutating func completeLevel(_ number: Int) -> Reward {
+    public mutating func completeLevel(_ number: Int, seconds: Int = 0, hintsUsed: Int = 0) -> Reward {
         var reward = Reward()
         gridsSolved += 1
+        reward.noHint = hintsUsed == 0
+        let key = String(number)
+        let previous = levelStats[key]
+        let time = max(1, seconds)
+        reward.newBest = previous != nil && time < previous!.bestTime
+        levelStats[key] = LevelStat(bestTime: min(previous?.bestTime ?? time, time),
+                                    noHint: (previous?.noHint ?? false) || reward.noHint)
         guard number == levelsDone + 1 else { return reward }
         levelsDone = number
         reward.firstTime = true
         reward.hints = Economy.levelReward(number)
         hints += reward.hints
         reward.unlockedTheme = Catalog.themes.first { $0.price == .level(number) }?.id
+        if Chapters.isChallenge(number) { reward.chapterDone = Chapters.chapter(of: number) }
         return reward
+    }
+
+    /// Niveaux finis sans indice dans un chapitre.
+    public func medals(chapter: Int) -> Int {
+        Chapters.levels(of: chapter).filter { stat($0)?.noHint == true }.count
+    }
+
+    // MARK: Mode Libre
+
+    private static func freeKey(_ size: Int, _ difficulty: Difficulty) -> String { "\(size)-\(difficulty.rawValue)" }
+
+    /// Prochaine grille de cette série (la grille commencée, s'il y en a une).
+    public func freeKind(size: Int, difficulty: Difficulty) -> PuzzleKind {
+        .free(size: size, difficulty: difficulty, number: (freeSolved[Self.freeKey(size, difficulty)] ?? 0) + 1)
+    }
+
+    public mutating func completeFree(size: Int, difficulty: Difficulty) {
+        gridsSolved += 1
+        freeSolved[Self.freeKey(size, difficulty), default: 0] += 1
     }
 
     // MARK: Grille du jour
@@ -186,11 +241,14 @@ public struct Profile: Codable, Equatable, Sendable {
 
     public func saved(_ key: String) -> SavedGrid? { saved.first { $0.key == key } }
 
-    /// Garde une grille commencée (au plus 3 : niveau, jour, bonus ; les plus anciennes partent).
+    /// Grilles commencées gardées au plus (les plus anciennes partent).
+    public static let maxSaved = 6
+
+    /// Garde une grille commencée.
     public mutating func save(_ grid: SavedGrid) {
         saved.removeAll { $0.key == grid.key }
         saved.insert(grid, at: 0)
-        if saved.count > 3 { saved.removeLast(saved.count - 3) }
+        if saved.count > Self.maxSaved { saved.removeLast(saved.count - Self.maxSaved) }
     }
 
     public mutating func forget(_ key: String) {
@@ -204,7 +262,7 @@ public struct Profile: Codable, Equatable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case firstLaunch, levelsDone, hints, gridsSolved, noAds, ownedThemes, theme, creditedTransactions, lastDailyDay,
              streak, bestStreak, dailyTime, bonusUnlockedDay, bonusDoneDay, adHintsDay, adHintsCount, saved, soundOn,
-             hapticsOn, autoCrosses, showSymbols, tutorialDone
+             hapticsOn, autoCrosses, showSymbols, tutorialDone, levelStats, freeSolved
     }
 
     public init(from decoder: Decoder) throws {
@@ -232,5 +290,7 @@ public struct Profile: Codable, Equatable, Sendable {
         autoCrosses = try c.decodeIfPresent(Bool.self, forKey: .autoCrosses) ?? base.autoCrosses
         showSymbols = try c.decodeIfPresent(Bool.self, forKey: .showSymbols) ?? base.showSymbols
         tutorialDone = try c.decodeIfPresent(Bool.self, forKey: .tutorialDone) ?? base.tutorialDone
+        levelStats = try c.decodeIfPresent([String: LevelStat].self, forKey: .levelStats) ?? base.levelStats
+        freeSolved = try c.decodeIfPresent([String: Int].self, forKey: .freeSolved) ?? base.freeSolved
     }
 }

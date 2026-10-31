@@ -16,7 +16,7 @@ struct GameView: View {
     var body: some View {
         let palette = app.palette
         ZStack {
-            palette.background.ignoresSafeArea()
+            Backdrop(palette: palette)
             VStack(spacing: 14) {
                 topBar(palette)
                 ChainStrip(board: session.board, palette: palette)
@@ -89,7 +89,7 @@ struct GameView: View {
             .accessibilityLabel("Accueil")
             VStack(alignment: .leading, spacing: 1) {
                 Text(session.kind.title).font(Fonts.title(22)).foregroundStyle(palette.text)
-                Text("\(session.board.size) × \(session.board.size) · \(session.board.grid.difficulty.name)")
+                Text(subtitle)
                     .font(Fonts.body(13, .medium)).foregroundStyle(palette.secondary)
             }
             Spacer()
@@ -104,6 +104,14 @@ struct GameView: View {
             .overlay(Capsule().stroke(palette.stroke, lineWidth: 1))
         }
         .padding(.horizontal, 16)
+    }
+
+    private var subtitle: String {
+        let base = "\(session.board.size) × \(session.board.size) · \(session.board.grid.difficulty.name)"
+        if case .level(let number) = session.kind {
+            return "Chapitre \(Chapters.chapter(of: number))" + (Chapters.isChallenge(number) ? " · défi" : "") + " · " + base
+        }
+        return base
     }
 
     // MARK: Message
@@ -122,12 +130,17 @@ struct GameView: View {
 
     private func controls(_ palette: Palette) -> some View {
         HStack(spacing: 10) {
-            ControlButton(palette: palette, title: "Annuler", icon: "arrow.uturn.backward") { session.undo() }
-                .disabled(!session.board.canUndo)
-                .opacity(session.board.canUndo ? 1 : 0.45)
-            ControlButton(palette: palette, title: "Effacer", icon: "eraser") { session.clear() }
-            ControlButton(palette: palette, title: "Indice", icon: "lightbulb.fill", badge: "\(app.profile.hints)", accent: true) {
-                if session.hint() == .needHints { askHintAd = true }
+            ControlButton(palette: palette, title: "Annuler", action: { session.undo() }) {
+                Image(systemName: "arrow.uturn.backward").font(.system(size: 19, weight: .semibold))
+            }
+            .disabled(!session.board.canUndo)
+            .opacity(session.board.canUndo ? 1 : 0.45)
+            ControlButton(palette: palette, title: "Effacer", action: { session.clear() }) {
+                Image(systemName: "eraser").font(.system(size: 19, weight: .semibold))
+            }
+            ControlButton(palette: palette, title: "Indice", badge: "\(app.profile.hints)", accent: true,
+                          action: { if session.hint() == .needHints { askHintAd = true } }) {
+                HintIcon(size: 24)
             }
         }
         .padding(.horizontal, 16)
@@ -135,24 +148,30 @@ struct GameView: View {
 }
 
 /// Bouton de commande sous la grille.
-private struct ControlButton: View {
+private struct ControlButton<Icon: View>: View {
     let palette: Palette
     let title: String
-    let icon: String
     var badge: String?
     var accent = false
     let action: () -> Void
+    @ViewBuilder var icon: Icon
 
     var body: some View {
         Button(action: action) {
             VStack(spacing: 5) {
-                Image(systemName: icon).font(.system(size: 20, weight: .semibold))
+                icon.frame(height: 24)
                 Text(title).font(Fonts.body(13, .semibold))
             }
             .foregroundStyle(accent ? Color.black.opacity(0.85) : palette.text)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(accent ? palette.beam : palette.card))
+            .padding(.vertical, 11)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(accent ? AnyShapeStyle(LinearGradient(colors: [palette.beam.opacity(0.85), palette.beam],
+                                                                 startPoint: .top, endPoint: .bottom))
+                                 : AnyShapeStyle(palette.card))
+                    .shadow(color: accent ? palette.beam.opacity(0.45) : palette.shadow, radius: accent ? 10 : 8, y: 3)
+            )
             .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(accent ? .clear : palette.stroke, lineWidth: 1))
             .overlay(alignment: .topTrailing) {
                 if let badge {
@@ -166,7 +185,7 @@ private struct ControlButton: View {
                 }
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressStyle())
     }
 }
 
@@ -217,22 +236,45 @@ private struct WinCard: View {
             Spacer()
             VStack(spacing: 14) {
                 Text(title).font(Fonts.title(30)).foregroundStyle(palette.text)
+                if let chapter = session.reward?.chapterDone {
+                    Text("Chapitre \(chapter) « \(Chapters.name(chapter)) » terminé")
+                        .font(Fonts.body(15, .bold)).foregroundStyle(palette.beam)
+                }
                 HStack(spacing: 10) {
-                    Chip(palette: palette, text: formatTime(Double(session.finalSeconds)), icon: "clock.fill")
+                    Chip(palette: palette, text: formatTime(Double(session.finalSeconds))) {
+                        Image(systemName: "clock.fill").foregroundStyle(palette.secondary)
+                    }
                     if case .daily = session.kind, let reward = session.reward, reward.streak > 0 {
-                        Chip(palette: palette, text: "\(reward.streak) j", icon: "flame.fill", iconColor: Color(hex: "#FF7A1A"))
+                        Chip(palette: palette, text: "\(reward.streak) j") { FlameIcon(size: 18) }
                     }
                     if let reward = session.reward, reward.hints > 0 {
-                        Chip(palette: palette, text: "+\(reward.hints)", icon: "lightbulb.fill")
+                        Chip(palette: palette, text: "+\(reward.hints)") { HintIcon(size: 18) }
                     }
+                }
+                if case .level(let number) = session.kind, let reward = session.reward {
+                    HStack(spacing: 14) {
+                        if reward.noHint {
+                            HStack(spacing: 5) { MedalIcon(size: 18); Text("Sans indice") }
+                        }
+                        if reward.newBest {
+                            Label("Nouveau record", systemImage: "arrow.up.circle.fill")
+                        } else if let best = app.profile.stat(number)?.bestTime, best < session.finalSeconds {
+                            Text("Record : \(formatTime(Double(best)))")
+                        }
+                    }
+                    .font(Fonts.body(14, .semibold))
+                    .foregroundStyle(palette.secondary)
                 }
                 if case .daily = session.kind, session.hintsUsed > 0 {
                     Text("Classement : +\(Economy.hintPenaltySeconds) s par indice utilisé")
                         .font(Fonts.body(13, .medium)).foregroundStyle(palette.secondary)
                 }
                 if let theme = session.reward?.unlockedTheme {
-                    Label("Nouveau thème débloqué : \(Catalog.theme(theme).name)", systemImage: "paintpalette.fill")
-                        .font(Fonts.body(15, .bold)).foregroundStyle(palette.text)
+                    HStack(spacing: 8) {
+                        ThemesIcon(size: 22)
+                        Text("Nouveau thème débloqué : \(Catalog.theme(theme).name)")
+                    }
+                    .font(Fonts.body(15, .bold)).foregroundStyle(palette.text)
                 }
                 buttons(palette)
             }
@@ -249,6 +291,7 @@ private struct WinCard: View {
         case .level: "Bravo !"
         case .daily: "Grille du jour réussie !"
         case .bonus: "Grille bonus réussie !"
+        case .free: "Grille réussie !"
         }
     }
 
@@ -276,6 +319,9 @@ private struct WinCard: View {
                 .buttonStyle(PillButtonStyle(palette: palette, filled: false))
         case .bonus:
             Button("Niveau \(app.profile.nextLevel)") { leave { app.playNextLevel() } }
+                .buttonStyle(PillButtonStyle(palette: palette, tint: palette.beam))
+        case .free(let size, let difficulty, _):
+            Button("Grille suivante") { leave { app.playFree(size: size, difficulty: difficulty) } }
                 .buttonStyle(PillButtonStyle(palette: palette, tint: palette.beam))
         }
         Button("Accueil") { leave { app.goHome() } }

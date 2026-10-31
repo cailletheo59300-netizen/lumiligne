@@ -63,6 +63,17 @@ final class AppModel {
     // MARK: Grilles
 
     func playNextLevel() { play(.level(profile.nextLevel)) }
+
+    /// Un niveau du parcours (déjà fini, pour le rejouer, ou le prochain).
+    func playLevel(_ number: Int) {
+        guard profile.isUnlocked(number) else { return }
+        play(.level(number))
+    }
+
+    /// Mode Libre : la prochaine grille de cette taille et de cette difficulté (ou celle commencée).
+    func playFree(size: Int, difficulty: Difficulty) {
+        play(profile.freeKind(size: size, difficulty: difficulty))
+    }
     func playDaily() { play(.daily(today)) }
     func playBonus() { play(.bonus(today)) }
 
@@ -93,17 +104,19 @@ final class AppModel {
             profile.forget(kind.key)
             switch kind {
             case .level(let number):
-                reward = profile.completeLevel(number)
+                reward = profile.completeLevel(number, seconds: seconds, hintsUsed: hintsUsed)
             case .daily(let day):
                 reward = profile.completeDaily(day: day, time: Economy.dailyTime(seconds: seconds, hintsUsed: hintsUsed))
             case .bonus(let day):
                 reward = profile.completeBonus(day: day)
+            case .free(let size, let difficulty, _):
+                profile.completeFree(size: size, difficulty: difficulty)
             }
         }
         switch kind {
         case .level: if reward.firstTime { gameCenter.submitLevel(profile.levelsDone) }
         case .daily: gameCenter.submitDaily(seconds: Economy.dailyTime(seconds: seconds, hintsUsed: hintsUsed))
-        case .bonus: break
+        case .bonus, .free: break
         }
         adPacing.gridFinished()
         save()

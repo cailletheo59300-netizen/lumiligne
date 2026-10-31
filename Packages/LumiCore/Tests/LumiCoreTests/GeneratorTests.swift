@@ -41,7 +41,7 @@ final class GeneratorTests: XCTestCase {
     }
 
     func testFirstLevelsAndAWeekOfDailyGrids() {
-        for number in [1, 2, 3, 6, 11, 12, 36, 81, 151] {
+        for number in [1, 2, 3, 6, 11, 12, 20, 36, 40, 81, 151] {
             let grid = Puzzles.grid(.level(number))
             check(grid)
             XCTAssertEqual(grid.size, Puzzles.levelSize(number))
@@ -101,11 +101,47 @@ final class GeneratorTests: XCTestCase {
     }
 
     func testLevelPlan() {
-        XCTAssertEqual(Puzzles.levelSize(1), 5)
-        XCTAssertEqual(Puzzles.levelSize(36), 7)
-        XCTAssertEqual(Puzzles.levelSize(500), 9)
-        for number in 1...5 { XCTAssertEqual(Puzzles.levelDifficulty(number), .easy) }
-        XCTAssertEqual(Puzzles.levelDifficulty(8), .hard)
+        // Les 3 premiers niveaux : 5 × 5 faciles.
+        for number in 1...3 {
+            XCTAssertEqual(Puzzles.levelSize(number), 5)
+            XCTAssertEqual(Puzzles.levelDifficulty(number), .easy)
+        }
+        // Le chapitre 1 ne dépasse pas 6 × 6 ; son défi (niveau 20) est le plus grand.
+        XCTAssertEqual(Chapters.levels(of: 1).map(Puzzles.levelSize).max(), 6)
+        XCTAssertEqual(Puzzles.levelSize(20), 6)
+        XCTAssertTrue(Chapters.isChallenge(20))
+        // Les tailles restent mélangées, même loin dans le jeu : il y a toujours des petites grilles.
+        for chapter in [4, 12, 50] {
+            let sizes = Chapters.levels(of: chapter).map(Puzzles.levelSize)
+            XCTAssertTrue(sizes.contains(5))
+            XCTAssertTrue(sizes.contains(9))
+            XCTAssertEqual(Puzzles.levelSize(Chapters.levels(of: chapter).upperBound), 9)
+        }
+        // La difficulté monte : beaucoup de faciles au chapitre 1, presque que des difficiles au chapitre 8.
+        let easy1 = Chapters.levels(of: 1).filter { Puzzles.levelDifficulty($0) == .easy }.count
+        let hard8 = Chapters.levels(of: 8).filter { Puzzles.levelDifficulty($0) == .hard }.count
+        XCTAssertGreaterThanOrEqual(easy1, 10)
+        XCTAssertGreaterThanOrEqual(hard8, 15)
+        XCTAssertEqual(Puzzles.levelDifficulty(40), .hard)
+    }
+
+    func testChapters() {
+        XCTAssertEqual(Chapters.chapter(of: 1), 1)
+        XCTAssertEqual(Chapters.chapter(of: 20), 1)
+        XCTAssertEqual(Chapters.chapter(of: 21), 2)
+        XCTAssertEqual(Chapters.position(of: 21), 0)
+        XCTAssertEqual(Chapters.levels(of: 2), 21...40)
+        XCTAssertEqual(Chapters.name(1), "Éveil")
+        XCTAssertEqual(Chapters.name(11), "Infini")
+    }
+
+    func testFreeGrids() {
+        let kind = PuzzleKind.free(size: 9, difficulty: .easy, number: 3)
+        XCTAssertEqual(Puzzles.plan(kind).size, 9)
+        let grid = Puzzles.grid(kind)
+        check(grid)
+        XCTAssertEqual(grid, Puzzles.grid(kind))
+        XCTAssertNotEqual(kind.key, PuzzleKind.free(size: 9, difficulty: .easy, number: 4).key)
     }
 
     func testWeekday() {

@@ -44,14 +44,16 @@ public enum DayKey {
     }
 }
 
-/// Les trois sortes de grilles.
+/// Les sortes de grilles.
 public enum PuzzleKind: Equatable, Hashable, Sendable {
-    /// Niveau numéroté (1, 2, 3…), à faire dans l'ordre.
+    /// Niveau numéroté (1, 2, 3…) du parcours. Les niveaux finis se rejouent.
     case level(Int)
     /// Grille du jour, la même pour tout le monde.
     case daily(String)
     /// Grille bonus du jour, débloquée avec une pub une fois la grille du jour finie.
     case bonus(String)
+    /// Mode Libre : taille et difficulté au choix. `number` = numéro de la grille dans cette série (1, 2, 3…).
+    case free(size: Int, difficulty: Difficulty, number: Int)
 
     /// Clé de sauvegarde (grille commencée).
     public var key: String {
@@ -59,6 +61,7 @@ public enum PuzzleKind: Equatable, Hashable, Sendable {
         case .level(let number): "level-\(number)"
         case .daily(let day): "daily-\(day)"
         case .bonus(let day): "bonus-\(day)"
+        case .free(let size, let difficulty, let number): "free-\(size)-\(difficulty.rawValue)-\(number)"
         }
     }
 
@@ -67,7 +70,36 @@ public enum PuzzleKind: Equatable, Hashable, Sendable {
         case .level(let number): "Niveau \(number)"
         case .daily: "Grille du jour"
         case .bonus: "Grille bonus"
+        case .free: "Libre"
         }
+    }
+}
+
+/// Le parcours : des chapitres de 20 niveaux, sans fin. Chaque chapitre mélange les tailles (petites grilles rapides,
+/// moyennes, grandes) ; d'un chapitre à l'autre, c'est surtout la difficulté qui monte. Le 20e niveau d'un chapitre
+/// est un « défi » : la plus grande grille du chapitre, à sa difficulté la plus haute.
+public enum Chapters {
+    public static let levelsPerChapter = 20
+
+    public static func chapter(of level: Int) -> Int { (max(1, level) - 1) / levelsPerChapter + 1 }
+
+    /// Place du niveau dans son chapitre, de 0 à 19.
+    public static func position(of level: Int) -> Int { (max(1, level) - 1) % levelsPerChapter }
+
+    public static func firstLevel(of chapter: Int) -> Int { (max(1, chapter) - 1) * levelsPerChapter + 1 }
+
+    public static func levels(of chapter: Int) -> ClosedRange<Int> {
+        firstLevel(of: chapter)...(firstLevel(of: chapter) + levelsPerChapter - 1)
+    }
+
+    public static func isChallenge(_ level: Int) -> Bool { position(of: level) == levelsPerChapter - 1 }
+
+    private static let names = ["Éveil", "Lueur", "Prisme", "Reflet", "Éclat", "Aurore", "Zénith", "Comète",
+                                "Nébuleuse", "Constellation"]
+
+    /// Nom du chapitre (« Éveil », « Lueur »…), puis « Infini » après le 10e.
+    public static func name(_ chapter: Int) -> String {
+        chapter >= 1 && chapter <= names.count ? names[chapter - 1] : "Infini"
     }
 }
 
@@ -92,6 +124,9 @@ public enum Puzzles {
             return Plan(size: size, difficulty: difficulty, seed: SeededRandom.seed(from: "lumiligne-daily-\(day)"))
         case .bonus(let day):
             return Plan(size: 8, difficulty: .hard, seed: SeededRandom.seed(from: "lumiligne-bonus-\(day)"))
+        case .free(let size, let difficulty, let number):
+            return Plan(size: min(9, max(5, size)), difficulty: difficulty,
+                        seed: SeededRandom.seed(from: "lumiligne-free-\(size)-\(difficulty.rawValue)-\(number)"))
         }
     }
 
@@ -100,24 +135,39 @@ public enum Puzzles {
         return Generator.grid(size: plan.size, difficulty: plan.difficulty, seed: plan.seed)
     }
 
-    /// Taille des niveaux : 5 × 5 pour apprendre, puis la grille grandit jusqu'à 9 × 9.
+    /// Tailles permises dans le mode Libre.
+    public static let freeSizes = Array(5...9)
+
+    /// Taille d'un niveau. Dans un chapitre, le rythme alterne : petite, moyenne, petite, grande…
+    /// La plus grande taille du chapitre grandit avec les chapitres (6 × 6 au chapitre 1, jusqu'à 9 × 9 au chapitre 4),
+    /// mais les petites grilles restent toujours là.
     public static func levelSize(_ number: Int) -> Int {
-        switch number {
-        case ...10: 5
-        case ...35: 6
-        case ...80: 7
-        case ...150: 8
-        default: 9
+        let chapter = Chapters.chapter(of: number)
+        let position = Chapters.position(of: number)
+        let large = min(9, 5 + chapter)
+        // Les 3 premiers niveaux du jeu, pour apprendre : 5 × 5.
+        if chapter == 1, position < 3 { return 5 }
+        if Chapters.isChallenge(number) { return large }
+        let small = chapter >= 4 && (position / 4) % 2 == 1 ? 6 : 5
+        let medium = (small + large + 1) / 2
+        switch position % 4 {
+        case 0, 2: return small
+        case 1: return medium
+        default: return large
         }
     }
 
-    /// Difficulté des niveaux : les 5 premiers faciles, puis un cycle facile, moyen, moyen, difficile.
+    /// Difficulté d'un niveau : elle monte dans chaque chapitre, et d'un chapitre à l'autre.
     public static func levelDifficulty(_ number: Int) -> Difficulty {
-        if number <= 5 { return .easy }
-        switch number % 4 {
-        case 0: return .hard
-        case 1: return .easy
-        default: return .medium
+        let chapter = Chapters.chapter(of: number)
+        let t = Chapters.position(of: number)
+        if Chapters.isChallenge(number) { return chapter == 1 ? .medium : .hard }
+        switch chapter {
+        case 1: return t < 12 ? .easy : .medium
+        case 2: return t < 6 ? .easy : (t < 15 ? .medium : .hard)
+        case 3: return t < 3 ? .easy : (t < 11 ? .medium : .hard)
+        case 4, 5: return t < 9 ? .medium : .hard
+        default: return t % 5 == 0 ? .medium : .hard
         }
     }
 }

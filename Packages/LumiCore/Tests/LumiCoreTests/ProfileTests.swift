@@ -15,6 +15,44 @@ final class ProfileTests: XCTestCase {
         XCTAssertEqual(profile.levelsDone, 5)
     }
 
+    func testLevelStatsMedalsAndReplay() {
+        var profile = Profile()
+        XCTAssertTrue(profile.isUnlocked(1))
+        XCTAssertFalse(profile.isUnlocked(2))
+        var reward = profile.completeLevel(1, seconds: 80, hintsUsed: 2)
+        XCTAssertTrue(reward.firstTime)
+        XCTAssertFalse(reward.noHint)
+        XCTAssertEqual(profile.stat(1), LevelStat(bestTime: 80, noHint: false))
+        XCTAssertTrue(profile.isUnlocked(2))
+        // Rejouer le niveau 1 : meilleur temps et médaille, sans récompense ni progression.
+        reward = profile.completeLevel(1, seconds: 50, hintsUsed: 0)
+        XCTAssertFalse(reward.firstTime)
+        XCTAssertTrue(reward.newBest)
+        XCTAssertTrue(reward.noHint)
+        XCTAssertEqual(profile.stat(1), LevelStat(bestTime: 50, noHint: true))
+        XCTAssertEqual(profile.levelsDone, 1)
+        XCTAssertEqual(profile.medals(chapter: 1), 1)
+        // Un moins bon temps ne remplace pas le record, et la médaille reste.
+        profile.completeLevel(1, seconds: 90, hintsUsed: 1)
+        XCTAssertEqual(profile.stat(1), LevelStat(bestTime: 50, noHint: true))
+    }
+
+    func testChapterDone() {
+        var profile = Profile()
+        profile.levelsDone = 19
+        XCTAssertEqual(profile.completeLevel(20, seconds: 100).chapterDone, 1)
+        XCTAssertNil(profile.completeLevel(21, seconds: 100).chapterDone)
+    }
+
+    func testFreeMode() {
+        var profile = Profile()
+        XCTAssertEqual(profile.freeKind(size: 7, difficulty: .hard), .free(size: 7, difficulty: .hard, number: 1))
+        profile.completeFree(size: 7, difficulty: .hard)
+        XCTAssertEqual(profile.freeKind(size: 7, difficulty: .hard), .free(size: 7, difficulty: .hard, number: 2))
+        XCTAssertEqual(profile.freeKind(size: 5, difficulty: .hard), .free(size: 5, difficulty: .hard, number: 1))
+        XCTAssertEqual(profile.gridsSolved, 1)
+    }
+
     func testLevelThemeUnlock() {
         var profile = Profile()
         let mint = Catalog.theme("theme.mint")
@@ -91,9 +129,9 @@ final class ProfileTests: XCTestCase {
         profile.save(SavedGrid(key: "level-1", marks: [2], elapsed: 9, hintsUsed: 1))
         XCTAssertEqual(profile.saved.count, 2)
         XCTAssertEqual(profile.saved("level-1")?.elapsed, 9)
-        profile.save(SavedGrid(key: "a", marks: [], elapsed: 0, hintsUsed: 0))
-        profile.save(SavedGrid(key: "b", marks: [], elapsed: 0, hintsUsed: 0))
-        XCTAssertEqual(profile.saved.count, 3)
+        for key in ["a", "b", "c", "d", "e"] { profile.save(SavedGrid(key: key, marks: [], elapsed: 0, hintsUsed: 0)) }
+        XCTAssertEqual(profile.saved.count, Profile.maxSaved)
+        XCTAssertNil(profile.saved("level-1"))
         profile.forget("b")
         XCTAssertNil(profile.saved("b"))
     }

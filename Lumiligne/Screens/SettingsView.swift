@@ -14,7 +14,7 @@ struct SettingsView: View {
         let palette = app.palette
         NavigationStack {
             ZStack {
-                palette.background.ignoresSafeArea()
+                Backdrop(palette: palette)
                 ScrollView {
                     VStack(spacing: 16) {
                         card(palette, "Jeu", icon: "square.grid.3x3.fill") {
@@ -83,8 +83,7 @@ struct SettingsView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(palette.card))
-        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(palette.stroke, lineWidth: 1))
+        .card(palette)
     }
 
     private func toggle(_ palette: Palette, _ title: String, icon: String, detail: String? = nil, value: Binding<Bool>) -> some View {
@@ -150,7 +149,7 @@ struct RulesView: View {
         let palette = app.palette
         NavigationStack {
             ZStack {
-                palette.background.ignoresSafeArea()
+                Backdrop(palette: palette)
                 ScrollView {
                     VStack(spacing: 12) {
                         rule(palette, number: 1, text: "Une gemme par zone de couleur. Chaque zone porte un numéro.",
@@ -161,12 +160,13 @@ struct RulesView: View {
                         VStack(alignment: .leading, spacing: 10) {
                             tip(palette, "hand.tap.fill", "Un appui : une croix. Deux appuis : une gemme. Trois : la case se vide.")
                             tip(palette, "hand.draw.fill", "Glisse le doigt pour poser des croix sur plusieurs cases.")
-                            tip(palette, "lightbulb.fill", "Bloqué ? L'indice explique la prochaine déduction. Jamais besoin de deviner.")
+                            tip(palette, "sparkles", "Bloqué ? L'indice explique la prochaine déduction. Jamais besoin de deviner.")
                             tip(palette, "calendar", "Chaque jour, une grille du jour, la même pour tout le monde. Finis-la chaque jour pour ta série.")
+                            tip(palette, "map.fill", "Le parcours avance par chapitres de 20 niveaux, toutes tailles mélangées, de plus en plus durs. Le mode Libre te laisse choisir taille et difficulté.")
                         }
                         .padding(16)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(palette.card))
+                        .card(palette, radius: 18)
                         Button("C'est parti") { dismiss() }
                             .buttonStyle(PillButtonStyle(palette: palette, tint: palette.beam))
                             .padding(.top, 4)
@@ -196,7 +196,7 @@ struct RulesView: View {
             Spacer(minLength: 0)
         }
         .padding(14)
-        .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(palette.card))
+        .card(palette, radius: 18)
     }
 
     private func tip(_ palette: Palette, _ icon: String, _ text: String) -> some View {

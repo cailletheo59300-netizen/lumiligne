@@ -249,8 +249,14 @@ private struct BeamLayer: View {
                 BeamSegment(from: center(link.from), to: center(link.to), color: palette.beam, width: cell * 0.09)
             }
             if solved {
-                ChainSweep(points: board.grid.solution.map(center), color: palette.beam, width: cell * 0.16,
-                           duration: Double(board.size) * 0.12)
+                let points = board.grid.solution.map(center)
+                let duration = Double(board.size) * 0.12
+                ChainSweep(points: points, color: palette.beam, width: cell * 0.16, duration: duration)
+                ForEach(points.indices, id: \.self) { k in
+                    SparkleBurst(color: palette.beam, size: cell * 1.6,
+                                 delay: duration * Double(k) / Double(max(1, points.count - 1)))
+                        .position(points[k])
+                }
             }
         }
         .allowsHitTesting(false)
@@ -330,5 +336,40 @@ private struct HighlightLayer: View {
             pulse = false
             withAnimation(.easeInOut(duration: 0.45).repeatCount(5, autoreverses: true)) { pulse = true }
         }
+    }
+}
+
+/// Gerbe d'étincelles sur une gemme quand le rayon de victoire passe dessus.
+private struct SparkleBurst: View {
+    let color: Color
+    let size: CGFloat
+    let delay: Double
+    @State private var started = false
+    @State private var spread = false
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(RadialGradient(colors: [color.opacity(0.7), .clear], center: .center, startRadius: 0, endRadius: size * 0.5))
+                .scaleEffect(spread ? 1.3 : 0.2)
+                .opacity(spread ? 0 : 1)
+            ForEach(0..<6, id: \.self) { i in
+                let angle = Double(i) / 6 * 2 * .pi + 0.4
+                SparkleShape()
+                    .fill(i % 2 == 0 ? Color.white : color)
+                    .frame(width: size * 0.18, height: size * 0.18)
+                    .offset(x: spread ? cos(angle) * size * 0.5 : 0, y: spread ? sin(angle) * size * 0.5 : 0)
+                    .scaleEffect(spread ? 0.4 : 1)
+                    .opacity(spread ? 0 : 1)
+            }
+        }
+        .frame(width: size, height: size)
+        .opacity(started ? 1 : 0)
+        .task {
+            try? await Task.sleep(for: .seconds(delay))
+            started = true
+            withAnimation(.easeOut(duration: 0.75)) { spread = true }
+        }
+        .allowsHitTesting(false)
     }
 }

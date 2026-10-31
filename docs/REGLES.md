@@ -40,13 +40,36 @@ La même graine donne toujours la même grille, sur tous les iPhone : c'est ce q
 
 ## Les grilles
 
-| Sorte | Taille et difficulté | Code |
-|---|---|---|
-| **Niveaux** (dans l'ordre, sans fin) | 5 × 5 jusqu'au niveau 10, 6 × 6 jusqu'au 35, 7 × 7 jusqu'au 80, 8 × 8 jusqu'au 150, puis 9 × 9. Les 5 premiers faciles, puis un cycle facile, moyen, moyen, difficile. | `Puzzles.levelSize`, `levelDifficulty` |
-| **Grille du jour** (la même pour tous, de minuit à minuit UTC) | lundi 6 × 6 moyen, mardi 6 × 6 difficile, mercredi 7 × 7 moyen, jeudi et vendredi 7 × 7 difficile, samedi 8 × 8 moyen, dimanche 8 × 8 difficile | `Puzzles.plan` |
-| **Grille bonus** (après la grille du jour, avec une pub, 1 par jour) | 8 × 8 difficile | `Puzzles.plan` |
+### Le parcours (niveaux)
+- **Des chapitres de 20 niveaux, à l'infini** : Éveil, Lueur, Prisme, Reflet, Éclat, Aurore, Zénith, Comète, Nébuleuse, Constellation, puis « Infini ».
+- **Les tailles sont mélangées dans chaque chapitre**, avec un rythme : petite, moyenne, petite, grande… La plus grande taille grandit avec les chapitres (6 × 6 au chapitre 1, 7 × 7 au 2, 8 × 8 au 3, 9 × 9 à partir du 4), mais les petites grilles restent toujours là.
+- **La difficulté monte** dans chaque chapitre, et d'un chapitre à l'autre :
 
-Une grille commencée est gardée : on la reprend là où on l'avait laissée (chronomètre compris).
+| Chapitre | Difficulté |
+|---|---|
+| 1 | 12 faciles puis moyens |
+| 2 | faciles, moyens, puis difficiles |
+| 3 | quelques faciles, moyens, puis difficiles |
+| 4 et 5 | moyens puis difficiles |
+| 6 et plus | presque tous difficiles (1 moyen sur 5) |
+
+- Les 3 premiers niveaux du jeu sont des 5 × 5 faciles, pour apprendre.
+- Le **20e niveau** de chaque chapitre est un **défi** : la plus grande grille du chapitre, difficile.
+- Les niveaux se débloquent dans l'ordre. **Les niveaux finis se rejouent** (écran Parcours), pour battre son **meilleur temps** ou gagner la **médaille « sans indice »**. Les récompenses (indices, thèmes) ne comptent qu'au premier passage.
+
+Code : `Chapters` et `Puzzles.levelSize` / `levelDifficulty` dans `Puzzles.swift`.
+
+### Le mode Libre
+Taille (5 × 5 à 9 × 9) et difficulté au choix, autant de grilles qu'on veut. Hors parcours : pas de récompense ni de classement. Chaque série (taille + difficulté) a ses grilles numérotées ; une grille commencée se reprend.
+
+### Grille du jour et grille bonus
+
+| Sorte | Taille et difficulté |
+|---|---|
+| **Grille du jour** (la même pour tous, de minuit à minuit UTC) | lundi 6 × 6 moyen, mardi 6 × 6 difficile, mercredi 7 × 7 moyen, jeudi et vendredi 7 × 7 difficile, samedi 8 × 8 moyen, dimanche 8 × 8 difficile |
+| **Grille bonus** (après la grille du jour, avec une pub, 1 par jour) | 8 × 8 difficile |
+
+Une grille commencée est gardée (6 au plus) : on la reprend là où on l'avait laissée, chronomètre compris.
 
 ## Les indices (la seule monnaie)
 Tous les chiffres sont dans `Economy.swift`.

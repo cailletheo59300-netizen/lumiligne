@@ -22,7 +22,7 @@ struct ShopView: View {
         let palette = app.palette
         NavigationStack {
             ZStack {
-                palette.background.ignoresSafeArea()
+                Backdrop(palette: palette)
                 ScrollView {
                     VStack(spacing: 16) {
                         Picker("Rayon", selection: $tab) {
@@ -54,7 +54,7 @@ struct ShopView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Chip(palette: palette, text: "\(app.profile.hints)", icon: "lightbulb.fill").fixedSize()
+                    Chip(palette: palette, text: "\(app.profile.hints)") { HintIcon(size: 18) }.fixedSize()
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("OK") { dismiss() }.font(Fonts.body(17, .bold))
@@ -95,9 +95,7 @@ private struct ThemeCard: View {
             action(palette)
         }
         .padding(12)
-        .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(palette.card))
-        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
-            .stroke(selected ? palette.beam : palette.stroke, lineWidth: selected ? 2.5 : 1))
+        .card(palette, radius: 18, border: selected ? palette.beam : nil, borderWidth: selected ? 2.5 : 1)
     }
 
     @ViewBuilder
@@ -141,8 +139,13 @@ private struct ThemeCard: View {
 }
 
 /// Petite grille d'exemple dessinée avec les couleurs d'un thème (zones, gemmes, rayon).
+/// `progress` (0…1) dessine le rayon progressivement, les gemmes apparaissant à son passage (grille animée de l'accueil).
 struct ThemePreview: View {
     let palette: Palette
+    var progress: Double = 1
+    var beamOpacity: Double = 1
+    /// Sans fond (posée directement sur l'écran).
+    var transparent = false
 
     /// Grille 5 × 5 d'exemple et sa solution (gemmes alignées deux à deux, qui ne se touchent pas).
     private static let zones = [0, 0, 1, 1, 1,
@@ -154,15 +157,25 @@ struct ThemePreview: View {
 
     var body: some View {
         ZStack {
-            palette.background
+            if !transparent { palette.background }
             Canvas { context, size in
-                let side = min(size.width, size.height) - 16
+                let side = min(size.width, size.height) - (transparent ? 4 : 16)
                 let c = side / 5
                 let origin = CGPoint(x: (size.width - side) / 2, y: (size.height - side) / 2)
                 func rect(_ i: Int) -> CGRect {
                     CGRect(x: origin.x + CGFloat(i % 5) * c, y: origin.y + CGFloat(i / 5) * c, width: c, height: c)
                 }
-                for i in 0..<25 { context.fill(Path(rect(i)), with: .color(palette.zone(Self.zones[i]))) }
+                let frame = Path(roundedRect: CGRect(origin: origin, size: CGSize(width: side, height: side)), cornerRadius: c * 0.25)
+                var clipped = context
+                clipped.clip(to: frame)
+                for i in 0..<25 { clipped.fill(Path(rect(i)), with: .color(palette.zone(Self.zones[i]))) }
+                var thin = Path()
+                for k in 1..<5 {
+                    let p = CGFloat(k) * c
+                    thin.move(to: CGPoint(x: origin.x + p, y: origin.y)); thin.addLine(to: CGPoint(x: origin.x + p, y: origin.y + side))
+                    thin.move(to: CGPoint(x: origin.x, y: origin.y + p)); thin.addLine(to: CGPoint(x: origin.x + side, y: origin.y + p))
+                }
+                clipped.stroke(thin, with: .color(palette.line.opacity(0.18)), lineWidth: 0.8)
                 var borders = Path()
                 for i in 0..<25 {
                     let r = rect(i)
@@ -173,29 +186,28 @@ struct ThemePreview: View {
                         borders.move(to: CGPoint(x: r.minX, y: r.maxY)); borders.addLine(to: CGPoint(x: r.maxX, y: r.maxY))
                     }
                 }
-                context.stroke(borders, with: .color(palette.line), lineWidth: 2)
-                context.stroke(Path(roundedRect: CGRect(origin: origin, size: CGSize(width: side, height: side)), cornerRadius: 4),
-                               with: .color(palette.line), lineWidth: 2.5)
+                clipped.stroke(borders, with: .color(palette.line), style: StrokeStyle(lineWidth: max(1.5, c * 0.07), lineCap: .round))
+                context.stroke(frame, with: .color(palette.line), lineWidth: max(2, c * 0.09))
+
+                let points = Self.gems.map { CGPoint(x: rect($0).midX, y: rect($0).midY) }
                 var beam = Path()
-                for (k, cell) in Self.gems.enumerated() {
-                    let r = rect(cell)
-                    let p = CGPoint(x: r.midX, y: r.midY)
-                    if k == 0 { beam.move(to: p) } else { beam.addLine(to: p) }
-                }
+                for (k, p) in points.enumerated() { if k == 0 { beam.move(to: p) } else { beam.addLine(to: p) } }
+                let drawn = beam.trimmedPath(from: 0, to: progress)
                 var glow = context
-                glow.addFilter(.blur(radius: 4))
-                glow.stroke(beam, with: .color(palette.beam), style: StrokeStyle(lineWidth: 6, lineCap: .round, lineJoin: .round))
-                context.stroke(beam, with: .color(palette.beam), style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
-                for cell in Self.gems {
-                    let r = rect(cell).insetBy(dx: c * 0.22, dy: c * 0.22)
-                    var gem = Path()
-                    gem.move(to: CGPoint(x: r.midX, y: r.minY))
-                    gem.addLine(to: CGPoint(x: r.maxX, y: r.midY))
-                    gem.addLine(to: CGPoint(x: r.midX, y: r.maxY))
-                    gem.addLine(to: CGPoint(x: r.minX, y: r.midY))
-                    gem.closeSubpath()
-                    context.fill(gem, with: .color(.white))
-                    context.stroke(gem, with: .color(palette.line), lineWidth: 1.5)
+                glow.addFilter(.blur(radius: c * 0.2))
+                glow.stroke(drawn, with: .color(palette.beam.opacity(beamOpacity)), style: StrokeStyle(lineWidth: c * 0.28, lineCap: .round, lineJoin: .round))
+                context.stroke(drawn, with: .color(palette.beam.opacity(beamOpacity)), style: StrokeStyle(lineWidth: c * 0.12, lineCap: .round, lineJoin: .round))
+                for (k, cell) in Self.gems.enumerated() {
+                    // La gemme apparaît quand le rayon l'atteint.
+                    let reached = Double(k) / Double(Self.gems.count - 1)
+                    guard progress >= reached - 0.001 else { continue }
+                    let r = rect(cell).insetBy(dx: c * 0.18, dy: c * 0.18)
+                    let gem = DiamondShape().path(in: r)
+                    context.fill(gem, with: .linearGradient(Gradient(colors: [.white, palette.zone(Self.zones[cell])]),
+                                                            startPoint: CGPoint(x: r.midX, y: r.minY), endPoint: CGPoint(x: r.midX, y: r.maxY)))
+                    let table = DiamondShape().path(in: r.insetBy(dx: r.width * 0.28, dy: r.height * 0.28))
+                    context.fill(table, with: .color(.white.opacity(0.8)))
+                    context.stroke(gem, with: .color(palette.line), lineWidth: max(1.2, c * 0.06))
                 }
             }
         }
@@ -211,7 +223,7 @@ private struct OffersList: View {
         VStack(spacing: 14) {
             if !app.profile.noAds {
                 starterCard(palette)
-                offerRow(palette, product: .noAds, icon: "nosign", title: "Sans pub",
+                offerRow(palette, product: .noAds, title: "Sans pub",
                          detail: "Plus aucune pub entre les grilles. Pour toujours.")
             } else {
                 Label("Sans pub : activé. Merci !", systemImage: "checkmark.seal.fill")
@@ -219,7 +231,7 @@ private struct OffersList: View {
                     .foregroundStyle(palette.text)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(16)
-                    .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(palette.card))
+                    .card(palette, radius: 18)
             }
 
             Text("INDICES")
@@ -260,7 +272,7 @@ private struct OffersList: View {
                             .foregroundStyle(palette.secondary)
                     }
                     Spacer(minLength: 0)
-                    Image(systemName: "gift.fill").font(.system(size: 30)).foregroundStyle(palette.beam)
+                    ChestIcon(size: 58)
                 }
                 HStack(spacing: 8) {
                     ForEach(["theme.neon", "theme.aurora"], id: \.self) { id in
@@ -281,18 +293,17 @@ private struct OffersList: View {
                 }
             }
             .padding(16)
-            .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(palette.card))
-            .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).stroke(palette.beam, lineWidth: 2))
+            .card(palette, radius: 22, border: palette.beam, borderWidth: 2)
         }
         .buttonStyle(.plain)
     }
 
-    private func offerRow(_ palette: Palette, product: StoreProduct, icon: String, title: String, detail: String) -> some View {
+    private func offerRow(_ palette: Palette, product: StoreProduct, title: String, detail: String) -> some View {
         Button {
             Task { if await app.store.purchase(product) { app.haptics.success() } }
         } label: {
             HStack(spacing: 14) {
-                Image(systemName: icon).font(.system(size: 28, weight: .semibold)).foregroundStyle(palette.text).frame(width: 40)
+                NoAdsIcon(size: 40, tint: palette.text)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title).font(Fonts.body(18, .bold)).foregroundStyle(palette.text)
                     Text(detail).font(Fonts.body(13, .medium)).foregroundStyle(palette.secondary)
@@ -302,8 +313,7 @@ private struct OffersList: View {
                 priceTag(app.store.price(product), palette: palette)
             }
             .padding(16)
-            .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(palette.card))
-            .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(palette.stroke, lineWidth: 1))
+            .card(palette, radius: 20)
         }
         .buttonStyle(.plain)
     }
@@ -313,7 +323,8 @@ private struct OffersList: View {
             Task { if await app.store.purchase(product) { app.haptics.success() } }
         } label: {
             VStack(spacing: 8) {
-                Image(systemName: "lightbulb.fill").font(.system(size: 26)).foregroundStyle(palette.beam).frame(height: 34)
+                HintPile(count: product == .hintsSmall ? 1 : (product == .hintsMedium ? 2 : 3))
+                    .frame(height: 40)
                 Text("\(product.hints)").font(Fonts.number(22, .heavy)).foregroundStyle(palette.text)
                 Text("indices").font(Fonts.body(12, .medium)).foregroundStyle(palette.secondary)
                 priceTag(app.store.price(product), palette: palette)
@@ -321,9 +332,7 @@ private struct OffersList: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
             .padding(.horizontal, 6)
-            .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(palette.card))
-            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(bonus != nil ? palette.beam.opacity(0.7) : palette.stroke, lineWidth: bonus != nil ? 1.5 : 1))
+            .card(palette, radius: 18, border: bonus != nil ? palette.beam.opacity(0.7) : nil, borderWidth: bonus != nil ? 1.5 : 1)
             .overlay(alignment: .top) {
                 if let bonus {
                     Text(bonus)
@@ -350,5 +359,24 @@ private struct OffersList: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
             .background(Capsule().fill(palette.beam))
+    }
+}
+
+/// Tas d'éclats d'indice : 1, 2 ou 3 gemmes selon la taille du pack.
+private struct HintPile: View {
+    let count: Int
+
+    var body: some View {
+        ZStack {
+            ForEach(0..<count, id: \.self) { i in
+                let offsets: [(CGFloat, CGFloat)] = count == 1 ? [(0, 0)] : (count == 2 ? [(-9, 4), (9, -2)] : [(-13, 6), (13, 6), (0, -6)])
+                FacetedGem(size: count == 1 ? 34 : 28)
+                    .offset(x: offsets[i].0, y: offsets[i].1)
+            }
+            SparkleShape().fill(IconInk.cream)
+                .overlay(SparkleShape().stroke(IconInk.outline, lineWidth: 0.8))
+                .frame(width: 13, height: 13)
+                .offset(x: 16, y: -14)
+        }
     }
 }
