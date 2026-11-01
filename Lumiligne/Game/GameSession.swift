@@ -43,15 +43,16 @@ final class GameSession: Identifiable {
     init(app: AppModel, kind: PuzzleKind, grid: LumiCore.Grid, saved: SavedGrid?, lives: Int?) {
         self.app = app
         self.kind = kind
+        let left = lives.map { max(0, min($0, saved?.livesLeft ?? $0)) }
         maxLives = lives
-        livesLeft = lives.map { max(0, min($0, saved?.livesLeft ?? $0)) }
+        livesLeft = left
         continues = saved?.continues ?? 0
-        failed = livesLeft == 0
+        failed = left == 0
         let marks = saved?.marks.compactMap { Mark(rawValue: $0) }
         board = Board(grid: grid, marks: marks)
         hintsUsed = saved?.hintsUsed ?? 0
         elapsedBefore = saved?.elapsed ?? 0
-        runningSince = failed ? nil : Date()
+        runningSince = left == 0 ? nil : Date()
     }
 
     var palette: Palette { app?.palette ?? Palette(Catalog.theme(Catalog.defaultTheme)) }
