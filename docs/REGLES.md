@@ -17,6 +17,21 @@ Code : `Layout.swift` (`conflict`, `blocked`).
 - Une gemme qui enfreint une règle devient rouge, tremble, et la raison s'affiche sous la grille.
 - Quand deux gemmes qui se suivent sont bien placées, le rayon les relie. Grille finie : le rayon parcourt toute la chaîne.
 
+## Les vies
+Une **gemme posée au mauvais endroit coûte une vie** : elle rougit, tremble, puis disparaît et la case est barrée. Les croix ne coûtent rien.
+
+| Grille | Vies |
+|---|---|
+| Chapitre 1 « Éveil » | 5 |
+| Parcours (chapitres 2 et suivants) | 3 |
+| Défi de fin de chapitre (20e niveau) | 2 |
+| Grille du jour, grille bonus | 3 |
+| Libre | au choix : sans limite, 5, 3 ou 1 |
+
+**Plus de vies** : « Continuer » avec une vidéo (+1 vie, une fois par grille ; +30 s au temps de la grille du jour), « Recommencer la grille » (toutes les vies rendues), ou Accueil. Une grille perdue reste perdue si on la quitte : on la retrouve au même point.
+
+Code : `Puzzles.lives`, `Economy.maxContinues`, `Board.isMistake` / `punish`.
+
 ## Comment les grilles sont fabriquées
 Aucune grille n'est faite à la main (`Generator.swift`) :
 1. une chaîne de gemmes tirée au hasard, qui respecte les règles ;
@@ -42,7 +57,8 @@ La même graine donne toujours la même grille, sur tous les iPhone : c'est ce q
 
 ### Le parcours (niveaux)
 - **Des chapitres de 20 niveaux, à l'infini** : Éveil, Lueur, Prisme, Reflet, Éclat, Aurore, Zénith, Comète, Nébuleuse, Constellation, puis « Infini ».
-- **Les tailles sont mélangées dans chaque chapitre**, avec un rythme : petite, moyenne, petite, grande… La plus grande taille grandit avec les chapitres (6 × 6 au chapitre 1, 7 × 7 au 2, 8 × 8 au 3, 9 × 9 à partir du 4), mais les petites grilles restent toujours là.
+- **Les tailles sont mélangées dans chaque chapitre**, avec un rythme : petite, moyenne, petite, grande… La plus grande taille grandit avec les chapitres (6 × 6 au chapitre 1, 7 × 7 au 2 avec un défi en 8 × 8, 9 × 9 dès le 3), mais les petites grilles restent toujours là.
+- Chaque chapitre a son **emblème** (une gemme à sa couleur) et une **récompense de fin** : 3 indices, et un thème aux chapitres 2, 4, 6 et 8.
 - **La difficulté monte** dans chaque chapitre, et d'un chapitre à l'autre :
 
 | Chapitre | Difficulté |
@@ -79,6 +95,7 @@ Tous les chiffres sont dans `Economy.swift`.
 | Au premier lancement | 3 |
 | Grille du jour finie (1 fois par jour) | 1, et 3 de plus tous les 7 jours de série |
 | Tous les 5 niveaux finis | 1 |
+| Fin de chapitre | 3 |
 | Grille bonus finie | 1 |
 | Une pub récompensée | 1 (5 fois par jour au plus) |
 | Achats | 10, 30 ou 100 ; 30 dans le pack de départ |
@@ -94,15 +111,18 @@ Un indice corrige d'abord une erreur (gemme mal placée, croix en trop), sinon i
 | Aube (clair) | gratuit, par défaut |
 | Nuit (sombre) | gratuit |
 | Menthe | niveau 15 |
-| Corail | niveau 40 |
-| Océan | niveau 80 |
-| **Néon** | 1,99 € (ou pack de départ) |
-| **Aurore** | 1,99 € (ou pack de départ) |
+| Corail | niveau 30 |
+| Sable | fin du chapitre 2 (niveau 40) |
+| Lavande | fin du chapitre 4 (niveau 80) |
+| Océan (sombre) | niveau 100 |
+| Forêt (sombre) | fin du chapitre 6 (niveau 120) |
+| Ardoise (sombre) | fin du chapitre 8 (niveau 160) |
+| **Néon**, **Aurore**, **Or & Marbre**, **Cerise** | 1,99 € chacun, ou tous les 4 dans le pack de départ |
 
 Un nouveau thème = une entrée dans `Catalog.swift` (couleurs + prix). Les couleurs des zones restent distinctes en luminosité ; le réglage **Symboles dans les zones** ajoute un symbole par zone (daltonisme), en plus des numéros.
 
 ## Les pubs
-**Récompensées**, toujours au choix du joueur : un indice en plus, la grille bonus du jour.
+**Récompensées**, toujours au choix du joueur, **y compris avec « Sans pub »** : un indice en plus, la grille bonus du jour, « Continuer » après avoir perdu toutes les vies.
 
 **Entre les grilles** : quand on quitte l'écran de victoire, si toutes ces conditions sont vraies (`AdPacing` dans `Economy.swift`) :
 - pas d'achat « Sans pub » (ni pack de départ) ;
@@ -117,9 +137,9 @@ Tout s'achète directement, sans hasard. Pas de mur de paiement : tout le jeu (n
 
 | Offre | Prix conseillé |
 |---|---|
-| Pack de départ (Sans pub + 30 indices + Néon + Aurore) | 4,99 € |
+| Pack de départ (Sans pub + 30 indices + les 4 thèmes premium) | 4,99 € |
 | Sans pub | 3,99 € |
-| Thème Néon / Aurore | 1,99 € |
+| Thème Néon / Aurore / Or & Marbre / Cerise | 1,99 € |
 | 10 / 30 / 100 indices | 0,99 € / 1,99 € / 4,99 € |
 
 ## ⚠️ Changer un réglage

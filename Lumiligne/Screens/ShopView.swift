@@ -224,7 +224,7 @@ private struct OffersList: View {
             if !app.profile.noAds {
                 starterCard(palette)
                 offerRow(palette, product: .noAds, title: "Sans pub",
-                         detail: "Plus aucune pub entre les grilles. Pour toujours.")
+                         detail: "Plus aucune pub entre les grilles, pour toujours. Les vidéos bonus (indice, continuer, grille bonus) restent à ton choix.")
             } else {
                 Label("Sans pub : activé. Merci !", systemImage: "checkmark.seal.fill")
                     .font(Fonts.body(16, .bold))
@@ -267,20 +267,41 @@ private struct OffersList: View {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Pack de départ").font(Fonts.title(24)).foregroundStyle(palette.text)
-                        Text("Sans pub + 30 indices + 2 thèmes premium")
+                        Text("Le meilleur pour commencer")
                             .font(Fonts.body(13, .medium))
                             .foregroundStyle(palette.secondary)
                     }
                     Spacer(minLength: 0)
                     ChestIcon(size: 58)
                 }
-                HStack(spacing: 8) {
-                    ForEach(["theme.neon", "theme.aurora"], id: \.self) { id in
-                        VStack(spacing: 4) {
+                // Ce que contient le pack, « Sans pub » en premier et bien visible.
+                HStack(spacing: 12) {
+                    NoAdsIcon(size: 40, tint: palette.text)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Sans pub").font(Fonts.body(18, .heavy)).foregroundStyle(palette.text)
+                        Text("Plus aucune pub entre les grilles, pour toujours")
+                            .font(Fonts.body(12, .medium)).foregroundStyle(palette.secondary)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(12)
+                .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(palette.beam.opacity(0.18)))
+                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(palette.beam.opacity(0.6), lineWidth: 1.5))
+                HStack(spacing: 10) {
+                    HintPile(count: 2).frame(width: 46, height: 40)
+                    Text("+ \(StoreProduct.starter.hints) indices").font(Fonts.body(16, .bold)).foregroundStyle(palette.text)
+                    Spacer(minLength: 0)
+                }
+                Text("+ \(StoreProduct.starter.themes.count) thèmes premium")
+                    .font(Fonts.body(16, .bold)).foregroundStyle(palette.text)
+                HStack(spacing: 6) {
+                    ForEach(StoreProduct.starter.themes, id: \.self) { id in
+                        VStack(spacing: 3) {
                             ThemePreview(palette: Palette(Catalog.theme(id)))
-                                .frame(height: 80)
-                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                            Text(Catalog.theme(id).name).font(Fonts.body(12, .bold)).foregroundStyle(palette.text)
+                                .frame(height: 62)
+                                .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                            Text(Catalog.theme(id).name).font(Fonts.body(10, .bold)).foregroundStyle(palette.text)
+                                .lineLimit(1).minimumScaleFactor(0.7)
                         }
                     }
                 }

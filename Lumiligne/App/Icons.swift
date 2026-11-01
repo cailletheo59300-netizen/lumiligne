@@ -338,3 +338,47 @@ struct MedalIcon: View {
         .accessibilityLabel("Sans indice")
     }
 }
+
+/// Cœur de vie : rouge facetté (plein) ou contour pâle (perdu).
+struct HeartIcon: View {
+    var size: CGFloat = 18
+    var full = true
+    var empty: Color = .gray
+
+    var body: some View {
+        ZStack {
+            if full {
+                HeartShape()
+                    .fill(LinearGradient(colors: [Color(hex: "#FF8A9B"), Color(hex: "#E5484D"), Color(hex: "#B8233A")],
+                                         startPoint: .top, endPoint: .bottom))
+                HeartShape()
+                    .fill(Color.white.opacity(0.45))
+                    .frame(width: size * 0.3, height: size * 0.24)
+                    .offset(x: -size * 0.17, y: -size * 0.14)
+                HeartShape().stroke(IconInk.outline, lineWidth: max(0.8, size * 0.07))
+            } else {
+                HeartShape().stroke(empty.opacity(0.5), style: StrokeStyle(lineWidth: max(1, size * 0.08), dash: [size * 0.12, size * 0.08]))
+            }
+        }
+        .frame(width: size, height: size * 0.9)
+        .frame(width: size, height: size)
+    }
+}
+
+struct HeartShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        let w = rect.width, h = rect.height, x = rect.minX, y = rect.minY
+        var path = Path()
+        path.move(to: CGPoint(x: x + w * 0.5, y: y + h))
+        path.addCurve(to: CGPoint(x: x, y: y + h * 0.3),
+                      control1: CGPoint(x: x + w * 0.18, y: y + h * 0.78), control2: CGPoint(x: x, y: y + h * 0.55))
+        path.addArc(center: CGPoint(x: x + w * 0.25, y: y + h * 0.28), radius: w * 0.25,
+                    startAngle: .degrees(180), endAngle: .degrees(-20), clockwise: false)
+        path.addArc(center: CGPoint(x: x + w * 0.75, y: y + h * 0.28), radius: w * 0.25,
+                    startAngle: .degrees(200), endAngle: .degrees(0), clockwise: false)
+        path.addCurve(to: CGPoint(x: x + w * 0.5, y: y + h),
+                      control1: CGPoint(x: x + w, y: y + h * 0.55), control2: CGPoint(x: x + w * 0.82, y: y + h * 0.78))
+        path.closeSubpath()
+        return path
+    }
+}

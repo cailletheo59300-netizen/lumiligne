@@ -22,6 +22,16 @@ final class GameSession: Identifiable {
     private(set) var flashZone: Int?
     private(set) var flashToken = 0
 
+    /// Vies de la grille (`nil` : sans limite) et vies restantes. Une gemme posée au mauvais endroit coûte une vie.
+    let maxLives: Int?
+    private(set) var livesLeft: Int?
+    /// « Continuer » utilisés (vidéo après avoir perdu toutes les vies).
+    private(set) var continues: Int
+    /// Plus de vies : la grille est bloquée jusqu'à « Continuer » ou « Recommencer ».
+    private(set) var failed = false
+    /// Compteur pour animer le cœur perdu.
+    private(set) var lifeLostToken = 0
+
     private(set) var solved = false
     private(set) var reward: Reward?
     private(set) var finalSeconds = 0
@@ -30,14 +40,18 @@ final class GameSession: Identifiable {
     private var runningSince: Date?
     private weak var app: AppModel?
 
-    init(app: AppModel, kind: PuzzleKind, grid: LumiCore.Grid, saved: SavedGrid?) {
+    init(app: AppModel, kind: PuzzleKind, grid: LumiCore.Grid, saved: SavedGrid?, lives: Int?) {
         self.app = app
         self.kind = kind
+        maxLives = lives
+        livesLeft = lives.map { max(0, min($0, saved?.livesLeft ?? $0)) }
+        continues = saved?.continues ?? 0
+        failed = livesLeft == 0
         let marks = saved?.marks.compactMap { Mark(rawValue: $0) }
         board = Board(grid: grid, marks: marks)
         hintsUsed = saved?.hintsUsed ?? 0
         elapsedBefore = saved?.elapsed ?? 0
-        runningSince = Date()
+        runningSince = failed ? nil : Date()
     }
 
     var palette: Palette { app?.palette ?? Palette(Catalog.theme(Catalog.defaultTheme)) }
@@ -59,16 +73,20 @@ final class GameSession: Identifiable {
     }
 
     func resume() {
-        guard !solved, runningSince == nil else { return }
+        guard !solved, !failed, runningSince == nil else { return }
         runningSince = Date()
     }
 
     // MARK: Gestes
 
     func tap(_ cell: Int) {
-        guard !solved else { return }
+        guard !solved, !failed else { return }
         let before = snapshot()
         let mark = board.tap(cell)
+        if mark == .gem, maxLives != nil, board.isMistake(cell) {
+            mistake(at: cell)
+            return
+        }
         switch mark {
         case .cross: app?.sound.play(.cross); app?.haptics.tap()
         case .gem: app?.sound.play(.gem(board.layout.zones[cell])); app?.haptics.gem()
@@ -81,7 +99,7 @@ final class GameSession: Identifiable {
 
     /// Glissé du doigt : croix sur les cases vides traversées (une seule étape d'annulation).
     func stroke(_ cell: Int) {
-        guard !solved else { return }
+        guard !solved, !failed else { return }
         if !stroking {
             stroking = true
             board.beginStroke()
@@ -100,7 +118,7 @@ final class GameSession: Identifiable {
     }
 
     func undo() {
-        guard !solved, board.canUndo else { return }
+        guard !solved, !failed, board.canUndo else { return }
         board.undo()
         app?.haptics.tap()
         clearMessage()
@@ -108,7 +126,7 @@ final class GameSession: Identifiable {
     }
 
     func clear() {
-        guard !solved else { return }
+        guard !solved, !failed else { return }
         board.clear()
         app?.haptics.tap()
         clearMessage()
@@ -125,7 +143,7 @@ final class GameSession: Identifiable {
 
     @discardableResult
     func hint() -> HintOutcome {
-        guard !solved, let app, let hint = board.hint(autoCrosses: autoCrosses) else { return .shown }
+        guard !solved, !failed, let app, let hint = board.hint(autoCrosses: autoCrosses) else { return .shown }
         if !hint.isFree {
             guard app.spendHint() else { return .needHints }
             hintsUsed += 1
@@ -140,6 +158,52 @@ final class GameSession: Identifiable {
         app.haptics.gem()
         changed(from: before, touched: nil, keepMessage: true)
         return .shown
+    }
+
+    // MARK: Vies
+
+    /// Gemme au mauvais endroit : une vie en moins, la gemme rougit puis part (la case est barrée).
+    private func mistake(at cell: Int) {
+        livesLeft = max(0, (livesLeft ?? 0) - 1)
+        lifeLostToken += 1
+        let left = livesLeft ?? 0
+        message = left > 0 ? "Pas ici ! Il te reste \(left) vie\(left > 1 ? "s" : "")." : "Plus de vies…"
+        messageIsError = true
+        highlight = []
+        app?.sound.play(.error)
+        app?.haptics.error()
+        if left == 0 {
+            failed = true
+            pause()
+        }
+        Task {
+            try? await Task.sleep(for: .seconds(0.55))
+            board.punish(cell)
+            persist()
+        }
+    }
+
+    var canContinue: Bool { continues < Economy.maxContinues }
+
+    /// Après une vidéo : on repart avec une vie.
+    func continueAfterAd() {
+        guard failed else { return }
+        continues += 1
+        livesLeft = Economy.continueLives
+        failed = false
+        clearMessage()
+        resume()
+        persist()
+    }
+
+    /// Recommencer la grille de zéro, toutes les vies rendues (le chronomètre continue).
+    func restart() {
+        board.restart()
+        livesLeft = maxLives
+        failed = false
+        clearMessage()
+        resume()
+        persist()
     }
 
     // MARK: Après chaque changement
@@ -188,7 +252,8 @@ final class GameSession: Identifiable {
 
     private func persist() {
         guard !solved else { return }
-        app?.keep(SavedGrid(key: kind.key, marks: board.marks.map(\.rawValue), elapsed: elapsed(), hintsUsed: hintsUsed))
+        app?.keep(SavedGrid(key: kind.key, marks: board.marks.map(\.rawValue), elapsed: elapsed(), hintsUsed: hintsUsed,
+                            livesLeft: livesLeft, continues: continues))
     }
 
     private func win() {
@@ -197,7 +262,7 @@ final class GameSession: Identifiable {
         finalSeconds = max(1, Int(elapsed().rounded()))
         highlight = []
         message = nil
-        reward = app?.finish(kind, seconds: finalSeconds, hintsUsed: hintsUsed)
+        reward = app?.finish(kind, seconds: finalSeconds, hintsUsed: hintsUsed, continues: continues)
         app?.haptics.success()
         // L'arpège part pendant que le rayon parcourt la chaîne (voir BoardView).
         Task {

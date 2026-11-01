@@ -86,7 +86,8 @@ final class AppModel {
             let saved = profile.saved(kind.key)
             adPacing.gridStarted()
             save()
-            session = GameSession(app: self, kind: kind, grid: grid, saved: saved)
+            session = GameSession(app: self, kind: kind, grid: grid, saved: saved,
+                                  lives: Puzzles.lives(kind, freeLives: profile.freeLives))
             route = .game
             preparing = false
         }
@@ -98,7 +99,7 @@ final class AppModel {
     }
 
     /// Grille finie (une seule fois par grille) : récompense, série, Game Center, pubs.
-    func finish(_ kind: PuzzleKind, seconds: Int, hintsUsed: Int) -> Reward {
+    func finish(_ kind: PuzzleKind, seconds: Int, hintsUsed: Int, continues: Int) -> Reward {
         var reward = Reward()
         update { profile in
             profile.forget(kind.key)
@@ -106,7 +107,8 @@ final class AppModel {
             case .level(let number):
                 reward = profile.completeLevel(number, seconds: seconds, hintsUsed: hintsUsed)
             case .daily(let day):
-                reward = profile.completeDaily(day: day, time: Economy.dailyTime(seconds: seconds, hintsUsed: hintsUsed))
+                reward = profile.completeDaily(day: day, time: Economy.dailyTime(seconds: seconds, hintsUsed: hintsUsed,
+                                                                                  continues: continues))
             case .bonus(let day):
                 reward = profile.completeBonus(day: day)
             case .free(let size, let difficulty, _):
@@ -115,7 +117,8 @@ final class AppModel {
         }
         switch kind {
         case .level: if reward.firstTime { gameCenter.submitLevel(profile.levelsDone) }
-        case .daily: gameCenter.submitDaily(seconds: Economy.dailyTime(seconds: seconds, hintsUsed: hintsUsed))
+        case .daily:
+            gameCenter.submitDaily(seconds: Economy.dailyTime(seconds: seconds, hintsUsed: hintsUsed, continues: continues))
         case .bonus, .free: break
         }
         adPacing.gridFinished()
@@ -160,6 +163,11 @@ final class AppModel {
         update { $0.earnAdHint(today: day) }
         haptics.success()
         return true
+    }
+
+    /// « Continuer » après avoir perdu toutes les vies, contre une vidéo. Renvoie vrai si elle a été vue.
+    func continueWithAd() async -> Bool {
+        await watchRewarded(.continueGrid)
     }
 
     /// Débloque la grille bonus du jour contre une pub. Renvoie vrai si elle est débloquée.

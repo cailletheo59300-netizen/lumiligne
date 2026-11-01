@@ -160,6 +160,7 @@ struct RulesView: View {
                         VStack(alignment: .leading, spacing: 10) {
                             tip(palette, "hand.tap.fill", "Un appui : une croix. Deux appuis : une gemme. Trois : la case se vide.")
                             tip(palette, "hand.draw.fill", "Glisse le doigt pour poser des croix sur plusieurs cases.")
+                            tip(palette, "heart.fill", "Attention aux vies : chaque gemme posée au mauvais endroit en coûte une (les croix sont gratuites). Plus de vies : continue avec une vidéo, ou recommence.")
                             tip(palette, "sparkles", "Bloqué ? L'indice explique la prochaine déduction. Jamais besoin de deviner.")
                             tip(palette, "calendar", "Chaque jour, une grille du jour, la même pour tout le monde. Finis-la chaque jour pour ta série.")
                             tip(palette, "map.fill", "Le parcours avance par chapitres de 20 niveaux, toutes tailles mélangées, de plus en plus durs. Le mode Libre te laisse choisir taille et difficulté.")

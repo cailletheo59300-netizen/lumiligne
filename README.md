@@ -47,9 +47,11 @@ Le temps du jour compte +30 s par indice utilisé. Il faut aussi cocher Game Cen
 | Identifiant | Type | Nom affiché | Prix conseillé |
 |---|---|---|---|
 | `app.brainlix.lumiligne.noads` | Non consommable | Sans pub | 3,99 € |
-| `app.brainlix.lumiligne.starter` | Non consommable | Pack de départ (Sans pub + 30 indices + thèmes Néon et Aurore) | 4,99 € |
+| `app.brainlix.lumiligne.starter` | Non consommable | Pack de départ (Sans pub + 30 indices + 4 thèmes premium) | 4,99 € |
 | `app.brainlix.lumiligne.theme.neon` | Non consommable | Thème Néon | 1,99 € |
 | `app.brainlix.lumiligne.theme.aurora` | Non consommable | Thème Aurore | 1,99 € |
+| `app.brainlix.lumiligne.theme.gold` | Non consommable | Thème Or & Marbre | 1,99 € |
+| `app.brainlix.lumiligne.theme.cherry` | Non consommable | Thème Cerise | 1,99 € |
 | `app.brainlix.lumiligne.hints.small` | Consommable | 10 indices | 0,99 € |
 | `app.brainlix.lumiligne.hints.medium` | Consommable | 30 indices | 1,99 € |
 | `app.brainlix.lumiligne.hints.large` | Consommable | 100 indices | 4,99 € |
@@ -58,7 +60,7 @@ Chaque achat a besoin d'une capture d'écran pour l'examen d'Apple (la boutique 
 
 ### 4. AdMob (avant la sortie)
 - AdMob → Applications → Ajouter une application → iOS → « Lumiligne » (« non publiée » pour l'instant).
-- Créer 3 blocs : 2 récompensés (« Un indice », « Grille bonus ») et 1 interstitiel (« Entre les grilles »).
+- Créer 4 blocs : 3 récompensés (« Un indice », « Grille bonus », « Continuer ») et 1 interstitiel (« Entre les grilles »).
 - Me donner les identifiants (ils sont publics) : je les mets dans `Config/App.xcconfig` (`ADMOB_APP_ID`) et `Lumiligne/Services/Ads.swift` (`AdConfig`).
 - En attendant, l'app utilise les identifiants de test de Google. Xcode et TestFlight affichent toujours des pubs de test.
 - `app-ads.txt` : rien à faire, celui de brainlix.site couvre déjà le compte. Indiquer `https://brainlix.site` comme site du développeur dans la fiche.

@@ -137,6 +137,27 @@ public struct Board: Equatable, Sendable {
         }
     }
 
+    /// Gemme posée sur une case qui n'est pas la sienne (une erreur, qui coûte une vie).
+    public func isMistake(_ cell: Int) -> Bool {
+        marks[cell] == .gem && grid.solution[layout.zones[cell]] != cell
+    }
+
+    /// Erreur sanctionnée : la gemme part et la case est barrée (sans étape d'annulation : on ne rend pas la vie).
+    public mutating func punish(_ cell: Int) {
+        guard isMistake(cell) else { return }
+        marks[cell] = .cross
+        if let last = history.last, last[cell] != .gem {
+            // L'étape d'avant (sans cette gemme) reste ; on y garde la croix pour ne pas la reproposer.
+            history[history.count - 1][cell] = .cross
+        }
+    }
+
+    /// Recommencer la grille de zéro (vies remises par la partie).
+    public mutating func restart() {
+        marks = Array(repeating: .empty, count: marks.count)
+        history = []
+    }
+
     /// Toutes les gemmes posées, sans erreur (la solution est unique : c'est donc la bonne).
     public var isSolved: Bool {
         gemCells.count == size && gems.enumerated().allSatisfy { $0.element == grid.solution[$0.offset] }

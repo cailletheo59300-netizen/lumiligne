@@ -40,7 +40,11 @@ final class ProfileTests: XCTestCase {
     func testChapterDone() {
         var profile = Profile()
         profile.levelsDone = 19
-        XCTAssertEqual(profile.completeLevel(20, seconds: 100).chapterDone, 1)
+        let before = profile.hints
+        let reward = profile.completeLevel(20, seconds: 100)
+        XCTAssertEqual(reward.chapterDone, 1)
+        XCTAssertEqual(reward.chapterHints, Economy.chapterReward)
+        XCTAssertEqual(profile.hints, before + Economy.levelReward(20) + Economy.chapterReward)
         XCTAssertNil(profile.completeLevel(21, seconds: 100).chapterDone)
     }
 
@@ -59,6 +63,8 @@ final class ProfileTests: XCTestCase {
         XCTAssertFalse(profile.owns(mint))
         profile.levelsDone = 14
         XCTAssertEqual(profile.completeLevel(15).unlockedTheme, "theme.mint")
+        profile.levelsDone = 39
+        XCTAssertEqual(profile.completeLevel(40).unlockedTheme, "theme.sand")
         XCTAssertTrue(profile.owns(mint))
         profile.select(mint)
         XCTAssertEqual(profile.theme, "theme.mint")
@@ -120,6 +126,7 @@ final class ProfileTests: XCTestCase {
 
     func testDailyTimePenalty() {
         XCTAssertEqual(Economy.dailyTime(seconds: 95, hintsUsed: 2), 95 + 2 * Economy.hintPenaltySeconds)
+        XCTAssertEqual(Economy.dailyTime(seconds: 95, hintsUsed: 0, continues: 1), 95 + Economy.continuePenaltySeconds)
     }
 
     func testSavedGrids() {
@@ -172,7 +179,13 @@ final class ProfileTests: XCTestCase {
         XCTAssertEqual(Set(Catalog.themes.map(\.id)).count, Catalog.themes.count)
         for theme in Catalog.themes { XCTAssertGreaterThanOrEqual(theme.zones.count, 9) }
         XCTAssertTrue(StoreProduct.starter.removesAds)
-        XCTAssertEqual(StoreProduct.starter.themes.count, 2)
+        XCTAssertEqual(StoreProduct.starter.themes.count, 4)
+        // Chaque thème payant correspond à un achat, et chaque thème « niveau » à une fin de chapitre ou un palier.
+        for theme in Catalog.themes {
+            if case .store(let product) = theme.price { XCTAssertTrue(product.themes.contains(theme.id)) }
+        }
+        let levels = Catalog.themes.compactMap { theme -> Int? in if case .level(let n) = theme.price { return n }; return nil }
+        XCTAssertEqual(Set(levels).count, levels.count)
         XCTAssertTrue(StoreProduct.hintsSmall.isConsumable)
         XCTAssertFalse(StoreProduct.starter.isConsumable)
     }

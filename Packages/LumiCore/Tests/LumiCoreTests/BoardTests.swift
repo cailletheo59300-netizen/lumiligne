@@ -131,6 +131,22 @@ final class BoardTests: XCTestCase {
         XCTAssertEqual(board.marks[grid.solution[3]], .empty)
     }
 
+    func testMistakesArePunished() {
+        let grid = sampleGrid()
+        var board = Board(grid: grid)
+        let wrong = grid.layout.cellsOfZone[1].first { $0 != grid.solution[1] }!
+        board.set(wrong, .gem)
+        XCTAssertTrue(board.isMistake(wrong))
+        board.punish(wrong)
+        XCTAssertEqual(board.marks[wrong], .cross)
+        XCTAssertFalse(board.isMistake(wrong))
+        board.set(grid.solution[1], .gem)
+        XCTAssertFalse(board.isMistake(grid.solution[1]))
+        board.restart()
+        XCTAssertTrue(board.marks.allSatisfy { $0 == .empty })
+        XCTAssertFalse(board.canUndo)
+    }
+
     func testSavedMarksAreRestored() {
         let grid = sampleGrid()
         var board = Board(grid: grid)

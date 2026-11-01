@@ -19,16 +19,24 @@ struct GameView: View {
             Backdrop(palette: palette)
             VStack(spacing: 14) {
                 topBar(palette)
+                if let lives = session.maxLives {
+                    LivesBar(total: lives, left: session.livesLeft ?? 0, token: session.lifeLostToken, palette: palette)
+                }
                 ChainStrip(board: session.board, palette: palette)
                     .padding(.horizontal, 16)
                 BoardView(session: session, palette: palette, showSymbols: app.profile.showSymbols)
                     .padding(.horizontal, 12)
                 messageLine(palette)
                 Spacer(minLength: 0)
-                if !session.solved { controls(palette) }
+                if !session.solved && !session.failed { controls(palette) }
             }
             .padding(.vertical, 10)
 
+            if session.failed {
+                Color.black.opacity(0.22).ignoresSafeArea().transition(.opacity)
+                LoseCard(session: session, busy: $busy)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
             if showWin {
                 Color.black.opacity(0.18).ignoresSafeArea().transition(.opacity)
                 WinCard(session: session, busy: $busy)
@@ -37,6 +45,7 @@ struct GameView: View {
             if busy { LoadingVeil() }
         }
         .animation(.spring(response: 0.45, dampingFraction: 0.86), value: showWin)
+        .animation(.spring(response: 0.45, dampingFraction: 0.86), value: session.failed)
         .onChange(of: session.solved) { _, solved in
             guard solved else { return }
             Task {
@@ -337,5 +346,101 @@ private struct WinCard: View {
             await app.leaveGame(then: next)
             busy = false
         }
+    }
+}
+
+/// Les vies : un cœur par vie ; celui qu'on perd tremble et s'éteint.
+private struct LivesBar: View {
+    let total: Int
+    let left: Int
+    let token: Int
+    let palette: Palette
+    @State private var shake: CGFloat = 0
+
+    var body: some View {
+        HStack(spacing: 6) {
+            ForEach(0..<total, id: \.self) { i in
+                HeartIcon(size: 20, full: i < left, empty: palette.text)
+                    .scaleEffect(i < left ? 1 : 0.85)
+                    .offset(x: i == left ? shake : 0)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.5), value: left)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(left) vie\(left > 1 ? "s" : "") sur \(total)")
+        .onChange(of: token) {
+            withAnimation(.easeInOut(duration: 0.06).repeatCount(5, autoreverses: true)) { shake = 5 }
+            Task {
+                try? await Task.sleep(for: .seconds(0.32))
+                withAnimation(.easeOut(duration: 0.1)) { shake = 0 }
+            }
+        }
+    }
+}
+
+/// Plus de vies : continuer avec une vidéo (une fois), recommencer, ou revenir à l'accueil.
+private struct LoseCard: View {
+    @Environment(AppModel.self) private var app
+    let session: GameSession
+    @Binding var busy: Bool
+
+    var body: some View {
+        let palette = app.palette
+        VStack {
+            Spacer()
+            VStack(spacing: 14) {
+                HStack(spacing: 6) {
+                    ForEach(0..<(session.maxLives ?? 3), id: \.self) { _ in HeartIcon(size: 22, full: false, empty: palette.text) }
+                }
+                Text("Plus de vies").font(Fonts.title(30)).foregroundStyle(palette.text)
+                Text(detail)
+                    .font(Fonts.body(15, .medium))
+                    .foregroundStyle(palette.secondary)
+                    .multilineTextAlignment(.center)
+                if session.canContinue {
+                    Button {
+                        Task {
+                            busy = true
+                            let watched = await app.continueWithAd()
+                            busy = false
+                            if watched { session.continueAfterAd() }
+                        }
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "play.rectangle.fill")
+                            Text("Continuer")
+                            HeartIcon(size: 18)
+                            Text("+\(Economy.continueLives)")
+                        }
+                    }
+                    .buttonStyle(PillButtonStyle(palette: palette, tint: palette.beam))
+                }
+                Button("Recommencer la grille") {
+                    app.haptics.tap()
+                    session.restart()
+                }
+                .buttonStyle(PillButtonStyle(palette: palette, filled: !session.canContinue))
+                Button("Accueil") {
+                    app.haptics.tap()
+                    app.goHome()
+                }
+                .font(Fonts.body(16, .semibold))
+                .foregroundStyle(palette.secondary)
+                .padding(.top, 2)
+            }
+            .padding(22)
+            .background(RoundedRectangle(cornerRadius: 28, style: .continuous).fill(palette.dark ? Color(hex: palette.skin.surface) : .white))
+            .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous).stroke(palette.error.opacity(0.6), lineWidth: 2))
+            .shadow(color: .black.opacity(0.2), radius: 20, y: 6)
+            .padding(16)
+        }
+    }
+
+    private var detail: String {
+        var text = "Réfléchis bien avant de poser une gemme : chaque erreur coûte une vie."
+        if session.canContinue, case .daily = session.kind {
+            text += " Continuer ajoute \(Economy.continuePenaltySeconds) s à ton temps du jour."
+        }
+        return text
     }
 }

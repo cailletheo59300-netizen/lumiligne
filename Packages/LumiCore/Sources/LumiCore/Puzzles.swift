@@ -97,9 +97,16 @@ public enum Chapters {
     private static let names = ["Éveil", "Lueur", "Prisme", "Reflet", "Éclat", "Aurore", "Zénith", "Comète",
                                 "Nébuleuse", "Constellation"]
 
-    /// Nom du chapitre (« Éveil », « Lueur »…), puis « Infini » après le 10e.
+    /// Nom du chapitre (« Éveil », « Lueur »…), puis « Infini 1 », « Infini 2 »… après le 10e.
     public static func name(_ chapter: Int) -> String {
-        chapter >= 1 && chapter <= names.count ? names[chapter - 1] : "Infini"
+        chapter >= 1 && chapter <= names.count ? names[chapter - 1] : "Infini \(chapter - names.count)"
+    }
+
+    /// Couleur de l'emblème du chapitre (elles tournent après le 10e).
+    public static func color(_ chapter: Int) -> String {
+        let colors = ["#F5A623", "#4FB3E8", "#9B6CF0", "#2FBF8F", "#FF7A59", "#E85D9A", "#3F6FD8", "#E8B51F",
+                      "#7A5CC8", "#1FA6A0"]
+        return colors[(max(1, chapter) - 1) % colors.count]
     }
 }
 
@@ -135,6 +142,24 @@ public enum Puzzles {
         return Generator.grid(size: plan.size, difficulty: plan.difficulty, seed: plan.seed)
     }
 
+    /// Vies d'une grille (`nil` : sans limite). Une vie part à chaque gemme posée au mauvais endroit.
+    /// Parcours : 5 au chapitre 1 (pour apprendre), 2 pour le défi de fin de chapitre, 3 sinon.
+    /// Grille du jour et bonus : 3. Mode Libre : au choix du joueur (`freeLives`, 0 = sans limite).
+    public static func lives(_ kind: PuzzleKind, freeLives: Int = 3) -> Int? {
+        switch kind {
+        case .level(let number):
+            if Chapters.isChallenge(number) { return 2 }
+            return Chapters.chapter(of: number) == 1 ? 5 : 3
+        case .daily, .bonus:
+            return 3
+        case .free:
+            return freeLives > 0 ? freeLives : nil
+        }
+    }
+
+    /// Choix de vies proposés dans le mode Libre (0 = sans limite).
+    public static let freeLivesChoices = [0, 5, 3, 1]
+
     /// Tailles permises dans le mode Libre.
     public static let freeSizes = Array(5...9)
 
@@ -144,10 +169,11 @@ public enum Puzzles {
     public static func levelSize(_ number: Int) -> Int {
         let chapter = Chapters.chapter(of: number)
         let position = Chapters.position(of: number)
-        let large = min(9, 5 + chapter)
+        // Plus grande taille du chapitre : 6 × 6 au chapitre 1, 7 × 7 au 2 (défi en 8 × 8), 9 × 9 dès le 3.
+        let large = chapter == 1 ? 6 : (chapter == 2 ? 7 : 9)
         // Les 3 premiers niveaux du jeu, pour apprendre : 5 × 5.
         if chapter == 1, position < 3 { return 5 }
-        if Chapters.isChallenge(number) { return large }
+        if Chapters.isChallenge(number) { return chapter == 2 ? 8 : large }
         let small = chapter >= 4 && (position / 4) % 2 == 1 ? 6 : 5
         let medium = (small + large + 1) / 2
         switch position % 4 {

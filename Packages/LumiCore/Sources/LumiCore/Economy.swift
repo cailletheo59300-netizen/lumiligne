@@ -18,6 +18,13 @@ public enum Economy {
     public static let bonusReward = 1
     /// Secondes ajoutées au temps de la grille du jour par indice utilisé (classement plus juste).
     public static let hintPenaltySeconds = 30
+    /// Indices offerts à la fin de chaque chapitre (en plus de l'indice tous les 5 niveaux).
+    public static let chapterReward = 3
+    /// « Continuer » avec une vidéo après avoir perdu toutes les vies : combien de fois par grille, et combien de vies.
+    public static let maxContinues = 1
+    public static let continueLives = 1
+    /// Secondes ajoutées au temps de la grille du jour pour un « Continuer ».
+    public static let continuePenaltySeconds = 30
 
     /// Indices gagnés en finissant la grille du jour avec cette série.
     public static func dailyReward(streak: Int) -> Int {
@@ -29,9 +36,9 @@ public enum Economy {
         number % levelRewardEvery == 0 ? 1 : 0
     }
 
-    /// Temps envoyé au classement du jour : temps réel + pénalité par indice.
-    public static func dailyTime(seconds: Int, hintsUsed: Int) -> Int {
-        max(1, seconds) + hintsUsed * hintPenaltySeconds
+    /// Temps envoyé au classement du jour : temps réel + pénalités (indices, « Continuer »).
+    public static func dailyTime(seconds: Int, hintsUsed: Int, continues: Int = 0) -> Int {
+        max(1, seconds) + hintsUsed * hintPenaltySeconds + continues * continuePenaltySeconds
     }
 }
 

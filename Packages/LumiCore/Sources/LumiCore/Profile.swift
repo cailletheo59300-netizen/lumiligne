@@ -7,12 +7,18 @@ public struct SavedGrid: Codable, Equatable, Sendable {
     public var marks: [Int]
     public var elapsed: Double
     public var hintsUsed: Int
+    /// Vies restantes (`nil` : sans limite ou ancienne sauvegarde).
+    public var livesLeft: Int?
+    /// « Continuer » utilisés (vidéo après avoir perdu toutes les vies).
+    public var continues: Int?
 
-    public init(key: String, marks: [Int], elapsed: Double, hintsUsed: Int) {
+    public init(key: String, marks: [Int], elapsed: Double, hintsUsed: Int, livesLeft: Int? = nil, continues: Int? = nil) {
         self.key = key
         self.marks = marks
         self.elapsed = elapsed
         self.hintsUsed = hintsUsed
+        self.livesLeft = livesLeft
+        self.continues = continues
     }
 }
 
@@ -42,6 +48,8 @@ public struct Reward: Equatable, Sendable {
     public var noHint = false
     /// Chapitre terminé avec ce niveau (premier passage).
     public var chapterDone: Int?
+    /// Indices offerts pour le chapitre terminé (déjà comptés dans `hints`).
+    public var chapterHints = 0
 
     public init() {}
 }
@@ -79,6 +87,8 @@ public struct Profile: Codable, Equatable, Sendable {
     public var levelStats: [String: LevelStat] = [:]
     /// Grilles du mode Libre finies, par série (clé : « taille-difficulté »).
     public var freeSolved: [String: Int] = [:]
+    /// Vies choisies pour le mode Libre (0 = sans limite).
+    public var freeLives = 3
 
     // Grilles commencées (clé de `PuzzleKind`).
     public var saved: [SavedGrid] = []
@@ -123,7 +133,12 @@ public struct Profile: Codable, Equatable, Sendable {
         reward.hints = Economy.levelReward(number)
         hints += reward.hints
         reward.unlockedTheme = Catalog.themes.first { $0.price == .level(number) }?.id
-        if Chapters.isChallenge(number) { reward.chapterDone = Chapters.chapter(of: number) }
+        if Chapters.isChallenge(number) {
+            reward.chapterDone = Chapters.chapter(of: number)
+            reward.chapterHints = Economy.chapterReward
+            reward.hints += Economy.chapterReward
+            hints += Economy.chapterReward
+        }
         return reward
     }
 
@@ -262,7 +277,7 @@ public struct Profile: Codable, Equatable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case firstLaunch, levelsDone, hints, gridsSolved, noAds, ownedThemes, theme, creditedTransactions, lastDailyDay,
              streak, bestStreak, dailyTime, bonusUnlockedDay, bonusDoneDay, adHintsDay, adHintsCount, saved, soundOn,
-             hapticsOn, autoCrosses, showSymbols, tutorialDone, levelStats, freeSolved
+             hapticsOn, autoCrosses, showSymbols, tutorialDone, levelStats, freeSolved, freeLives
     }
 
     public init(from decoder: Decoder) throws {
@@ -292,5 +307,6 @@ public struct Profile: Codable, Equatable, Sendable {
         tutorialDone = try c.decodeIfPresent(Bool.self, forKey: .tutorialDone) ?? base.tutorialDone
         levelStats = try c.decodeIfPresent([String: LevelStat].self, forKey: .levelStats) ?? base.levelStats
         freeSolved = try c.decodeIfPresent([String: Int].self, forKey: .freeSolved) ?? base.freeSolved
+        freeLives = try c.decodeIfPresent(Int.self, forKey: .freeLives) ?? base.freeLives
     }
 }

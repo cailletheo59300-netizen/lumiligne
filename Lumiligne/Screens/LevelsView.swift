@@ -57,7 +57,8 @@ private struct ChapterSection: View {
         let levels = Array(Chapters.levels(of: chapter))
         let done = levels.filter { $0 <= app.profile.levelsDone }.count
         VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline) {
+            HStack(alignment: .center, spacing: 12) {
+                ChapterEmblem(chapter: chapter, size: 46)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("CHAPITRE \(chapter)")
                         .font(Fonts.body(12, .heavy))
@@ -82,6 +83,16 @@ private struct ChapterSection: View {
                     LevelPill(level: level, palette: palette) { play(level) }
                 }
             }
+            HStack(spacing: 6) {
+                Text("Fin du chapitre :").foregroundStyle(palette.secondary)
+                HintIcon(size: 16)
+                Text("+\(Economy.chapterReward)").foregroundStyle(palette.text)
+                if let theme = Catalog.themes.first(where: { $0.price == .level(levels[levels.count - 1]) }) {
+                    ThemesIcon(size: 16, colors: [Color(hex: theme.zones[0]), Color(hex: theme.zones[1]), Color(hex: theme.zones[2])])
+                    Text("thème \(theme.name)").foregroundStyle(palette.text)
+                }
+            }
+            .font(Fonts.body(13, .semibold))
         }
         .padding(16)
         .card(palette, radius: 22)
@@ -189,6 +200,23 @@ struct FreePlayView: View {
                             }
                         }
 
+                        section(palette, "Vies") {
+                            HStack(spacing: 8) {
+                                ForEach(Puzzles.freeLivesChoices, id: \.self) { value in
+                                    choice(palette, selected: value == app.profile.freeLives) {
+                                        VStack(spacing: 4) {
+                                            if value == 0 {
+                                                Image(systemName: "infinity").font(.system(size: 18, weight: .bold)).frame(height: 20)
+                                            } else {
+                                                HeartIcon(size: 20)
+                                            }
+                                            Text(value == 0 ? "Sans" : "\(value)").font(Fonts.number(13))
+                                        }
+                                    } action: { app.update { $0.freeLives = value } }
+                                }
+                            }
+                        }
+
                         section(palette, "Difficulté") {
                             HStack(spacing: 8) {
                                 ForEach(Difficulty.allCases, id: \.self) { value in
@@ -279,5 +307,21 @@ private struct MiniGridGlyph: View {
             }
             context.stroke(path, with: .color(color.opacity(0.8)), lineWidth: 1)
         }
+    }
+}
+
+/// Emblème d'un chapitre : une gemme à sa couleur, avec son numéro.
+struct ChapterEmblem: View {
+    let chapter: Int
+    var size: CGFloat = 44
+
+    var body: some View {
+        ZStack {
+            FacetedGem(colors: [.white, Color(hex: Chapters.color(chapter)), Color(hex: Chapters.color(chapter))], size: size)
+            Text("\(chapter)")
+                .font(Fonts.number(size * (chapter >= 10 ? 0.26 : 0.32), .heavy))
+                .foregroundStyle(Color(hex: "#1F2333"))
+        }
+        .accessibilityHidden(true)
     }
 }

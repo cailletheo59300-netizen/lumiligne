@@ -122,7 +122,8 @@ private struct ChapterCard: View {
                 app.haptics.tap()
                 showLevels = true
             } label: {
-                HStack(alignment: .firstTextBaseline) {
+                HStack(alignment: .center, spacing: 12) {
+                    ChapterEmblem(chapter: chapter, size: 42)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("CHAPITRE \(chapter)")
                             .font(Fonts.body(12, .heavy))

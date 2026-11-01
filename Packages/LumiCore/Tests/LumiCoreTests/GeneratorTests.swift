@@ -111,7 +111,7 @@ final class GeneratorTests: XCTestCase {
         XCTAssertEqual(Puzzles.levelSize(20), 6)
         XCTAssertTrue(Chapters.isChallenge(20))
         // Les tailles restent mélangées, même loin dans le jeu : il y a toujours des petites grilles.
-        for chapter in [4, 12, 50] {
+        for chapter in [3, 4, 12, 50] {
             let sizes = Chapters.levels(of: chapter).map(Puzzles.levelSize)
             XCTAssertTrue(sizes.contains(5))
             XCTAssertTrue(sizes.contains(9))
@@ -123,6 +123,19 @@ final class GeneratorTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(easy1, 10)
         XCTAssertGreaterThanOrEqual(hard8, 15)
         XCTAssertEqual(Puzzles.levelDifficulty(40), .hard)
+        // Défi du chapitre 2 en 8 × 8, 9 × 9 dès le chapitre 3.
+        XCTAssertEqual(Puzzles.levelSize(40), 8)
+        XCTAssertEqual(Chapters.levels(of: 2).map(Puzzles.levelSize).max(), 8)
+        XCTAssertTrue(Chapters.levels(of: 3).map(Puzzles.levelSize).contains(9))
+    }
+
+    func testLives() {
+        XCTAssertEqual(Puzzles.lives(.level(1)), 5)
+        XCTAssertEqual(Puzzles.lives(.level(21)), 3)
+        XCTAssertEqual(Puzzles.lives(.level(40)), 2)
+        XCTAssertEqual(Puzzles.lives(.daily("2026-11-01")), 3)
+        XCTAssertNil(Puzzles.lives(.free(size: 6, difficulty: .easy, number: 1), freeLives: 0))
+        XCTAssertEqual(Puzzles.lives(.free(size: 6, difficulty: .easy, number: 1), freeLives: 1), 1)
     }
 
     func testChapters() {
@@ -132,7 +145,8 @@ final class GeneratorTests: XCTestCase {
         XCTAssertEqual(Chapters.position(of: 21), 0)
         XCTAssertEqual(Chapters.levels(of: 2), 21...40)
         XCTAssertEqual(Chapters.name(1), "Éveil")
-        XCTAssertEqual(Chapters.name(11), "Infini")
+        XCTAssertEqual(Chapters.name(11), "Infini 1")
+        XCTAssertEqual(Chapters.name(12), "Infini 2")
     }
 
     func testFreeGrids() {

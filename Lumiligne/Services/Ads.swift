@@ -12,6 +12,8 @@ enum AdConfig {
     static let rewardedHint = ""
     /// Pub récompensée « Grille bonus ».
     static let rewardedBonus = ""
+    /// Pub récompensée « Continuer » (une vie de plus après avoir perdu).
+    static let rewardedContinue = ""
     /// Pub entre les grilles.
     static let interstitial = ""
 
@@ -20,7 +22,8 @@ enum AdConfig {
 }
 
 /// Pubs Google AdMob (sans serveur).
-/// - Pubs récompensées, toujours au choix du joueur : un indice, la grille bonus du jour.
+/// - Pubs récompensées, toujours au choix du joueur (même avec « Sans pub ») : un indice, la grille bonus du jour,
+///   continuer après avoir perdu toutes les vies.
 /// - Pub entre les grilles : quand le joueur quitte l'écran de victoire, selon `AdPacing` (jamais pendant une grille).
 /// - Consentement : message RGPD de Google (UMP), puis demande Apple de suivi (ATT), après la première grille finie.
 /// Xcode et TestFlight affichent toujours les pubs de test de Google : cliquer ses propres vraies pubs peut faire
@@ -29,7 +32,7 @@ enum AdConfig {
 @Observable
 final class AdsController {
     enum Placement {
-        case hint, bonus
+        case hint, bonus, continueGrid
     }
 
     private(set) var started = false
@@ -93,6 +96,7 @@ final class AdsController {
         let real: String = switch placement {
         case .hint: AdConfig.rewardedHint
         case .bonus: AdConfig.rewardedBonus
+        case .continueGrid: AdConfig.rewardedContinue
         }
         return testAds || real.isEmpty ? AdConfig.testRewarded : real
     }
@@ -100,7 +104,7 @@ final class AdsController {
     /// Charge à l'avance les pubs : elles s'ouvrent tout de suite quand le joueur les demande.
     func preload() {
         guard started else { return }
-        for placement in [Placement.hint, .bonus] { _ = loadRewarded(unit(placement)) }
+        for placement in [Placement.hint, .bonus, .continueGrid] { _ = loadRewarded(unit(placement)) }
         loadInterstitial()
     }
 
